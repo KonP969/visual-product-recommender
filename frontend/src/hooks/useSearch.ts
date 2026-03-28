@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { AppState, SearchResult } from '@/types'
 import { mockSearchByImage } from '@/lib/mockApi'
 
-const USE_MOCK = true // przełącz na false po podłączeniu backendu
+const USE_MOCK = false // przełącz na true żeby używać mock danych bez backendu
 
 interface UseSearchReturn {
   appState: AppState
