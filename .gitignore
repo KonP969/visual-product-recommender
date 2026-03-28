@@ -1,0 +1,28 @@
+# Node
+node_modules/
+dist/
+.env
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# ChromaDB
+chroma_db/
+*.chroma
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
