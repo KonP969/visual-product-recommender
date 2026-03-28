@@ -36,7 +36,7 @@ export async function upsertProduct(
   await col.upsert({
     ids: [id],
     embeddings: [embedding],
-    metadatas: [metadata as Record<string, string>],
+    metadatas: [metadata as unknown as Record<string, string>],
   })
 }
 
