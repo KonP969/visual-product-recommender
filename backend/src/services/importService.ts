@@ -3,10 +3,21 @@ import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct } from './chromaService'
 
-export async function runImport(feedPath: string): Promise<void> {
-  console.log(`[IMPORT] Parsing feed: ${feedPath}`)
-  const products = await parseFeed(feedPath)
-  console.log(`[IMPORT] Found ${products.length} products`)
+export interface ImportOptions {
+  limit?: number
+}
+
+export async function runImport(source: string, options: ImportOptions = {}): Promise<void> {
+  console.log(`[IMPORT] Parsing feed: ${source}`)
+  const allProducts = await parseFeed(source)
+
+  const products = options.limit
+    ? allProducts.slice(0, options.limit)
+    : allProducts
+
+  console.log(
+    `[IMPORT] Found ${allProducts.length} products, importing ${products.length}`,
+  )
 
   let success = 0
   let failed = 0

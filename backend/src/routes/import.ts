@@ -6,17 +6,28 @@ export const importRouter = Router()
 
 importRouter.post('/import', async (req, res, next) => {
   try {
-    const { feedPath } = req.body as { feedPath?: string }
+    const { feedUrl, feedPath, limit } = req.body as {
+      feedUrl?: string
+      feedPath?: string
+      limit?: number
+    }
 
-    if (!feedPath) {
-      res.status(400).json({ error: 'feedPath is required' })
+    const source = feedUrl ?? (feedPath ? path.resolve(feedPath) : null)
+
+    if (!source) {
+      res.status(400).json({ error: 'feedUrl or feedPath is required' })
       return
     }
 
-    const absolutePath = path.resolve(feedPath)
-    res.json({ message: 'Import started', path: absolutePath })
+    const parsedLimit = limit ? Math.max(1, Math.floor(Number(limit))) : undefined
 
-    runImport(absolutePath).catch((err: Error) => {
+    res.json({
+      message: 'Import started',
+      source,
+      limit: parsedLimit ?? 'all',
+    })
+
+    runImport(source, { limit: parsedLimit }).catch((err: Error) => {
       console.error('[IMPORT ERROR]', err.stack)
     })
   } catch (err) {
