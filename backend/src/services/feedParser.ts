@@ -22,48 +22,60 @@ async function fetchXml(source: string): Promise<string> {
   return readFile(source, 'utf-8')
 }
 
+function str(val: unknown): string | undefined {
+  if (typeof val === 'string') return val
+  if (val && typeof val === 'object' && '_' in val) return (val as { _: string })._
+  return undefined
+}
+
 function extractProducts(parsed: Record<string, unknown>): FeedProduct[] {
-  const channel =
-    (parsed?.rss as Record<string, unknown>)?.channel ??
-    (parsed?.feed as Record<string, unknown>)
+  // Format: <offers><o>...</o></offers>  (Ceneo / custom)
+  const offersRoot = parsed?.offers as Record<string, unknown> | undefined
+  if (offersRoot) {
+    const rawItems = offersRoot.o ?? []
+    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+    return (items as Record<string, unknown>[])
+      .map((item, idx): FeedProduct | null => {
+        const name = str(item.name)
+        const imageUrl = str(item.url_img)
+        if (!name || !imageUrl) return null
+        return {
+          id: str(item.external_id) ?? String(idx),
+          name,
+          imageUrl,
+          price: str(item.price) ?? '—',
+          productUrl: str(item.url_product),
+        }
+      })
+      .filter((p): p is FeedProduct => p !== null)
+  }
 
-  const rawItems = (channel as Record<string, unknown>)?.item ??
-    (channel as Record<string, unknown>)?.entry ?? []
+  // Format: <rss><channel><item>...</item></channel></rss>  (Google Merchant)
+  const rssChannel = (parsed?.rss as Record<string, unknown>)?.channel as Record<string, unknown> | undefined
+  // Format: <feed><entry>...</entry></feed>  (Atom)
+  const atomFeed = parsed?.feed as Record<string, unknown> | undefined
+  const channel = rssChannel ?? atomFeed
 
-  const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+  if (channel) {
+    const rawItems = channel.item ?? channel.entry ?? []
+    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+    return (items as Record<string, unknown>[])
+      .map((item, idx): FeedProduct | null => {
+        const name = str(item['g:title']) ?? str(item.title)
+        const imageUrl = str(item['g:image_link']) ?? str(item.image_link)
+        if (!name || !imageUrl) return null
+        return {
+          id: str(item['g:id']) ?? str(item.id) ?? String(idx),
+          name,
+          imageUrl,
+          price: str(item['g:price']) ?? str(item.price) ?? '—',
+          productUrl: str(item['g:link']) ?? str(item.link),
+        }
+      })
+      .filter((p): p is FeedProduct => p !== null)
+  }
 
-  return (items as Record<string, unknown>[])
-    .map((item, idx): FeedProduct | null => {
-      const name =
-        (item['g:title'] as string) ??
-        (item['title'] as string) ??
-        null
-
-      const imageUrl =
-        (item['g:image_link'] as string) ??
-        (item['image_link'] as string) ??
-        null
-
-      const price =
-        (item['g:price'] as string) ??
-        (item['price'] as string) ??
-        '—'
-
-      const productUrl =
-        (item['g:link'] as string) ??
-        (item['link'] as string) ??
-        undefined
-
-      const id =
-        (item['g:id'] as string) ??
-        (item['id'] as string) ??
-        String(idx)
-
-      if (!name || !imageUrl) return null
-
-      return { id, name, imageUrl, price, productUrl }
-    })
-    .filter((p): p is FeedProduct => p !== null)
+  return []
 }
 
 export async function parseFeed(source: string): Promise<FeedProduct[]> {
