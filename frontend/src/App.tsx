@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer'
 import { DropZone } from '@/components/DropZone'
 import { SearchResults } from '@/components/SearchResults'
 import { ImportPanel } from '@/components/ImportPanel'
+import { CatalogBrowser } from '@/components/CatalogBrowser'
 
 export default function App() {
   const { file, previewUrl, validationError, handleFile } = useFileUpload()
@@ -45,8 +46,9 @@ export default function App() {
           )}
         </div>
         <SearchResults appState={appState} searchResult={searchResult} />
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-4">
           <ImportPanel />
+          <CatalogBrowser />
         </div>
       </main>
       <Footer />

@@ -76,6 +76,18 @@ export async function searchSimilar(
   }
 }
 
+export async function listProducts(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<{ id: string; metadata: ProductMetadata }[]> {
+  const col = await getCollection()
+  const result = await col.get({ limit, offset, include: ['metadatas'] })
+  return result.ids.map((id, i) => ({
+    id,
+    metadata: result.metadatas[i] as unknown as ProductMetadata,
+  }))
+}
+
 export async function getProductCount(): Promise<number> {
   const col = await getCollection()
   return col.count()
