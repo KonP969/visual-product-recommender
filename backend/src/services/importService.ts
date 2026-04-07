@@ -1,7 +1,7 @@
 import { parseFeed } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
-import { upsertProduct } from './chromaService'
+import { upsertProduct, productExists } from './chromaService'
 
 export interface ImportOptions {
   limit?: number
@@ -20,6 +20,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   )
 
   let success = 0
+  let skipped = 0
   let failed = 0
 
   for (let i = 0; i < products.length; i++) {
@@ -27,6 +28,13 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
     const progress = `[${i + 1}/${products.length}]`
 
     try {
+      const exists = await productExists(product.id)
+      if (exists) {
+        skipped++
+        console.log(`[IMPORT] ${progress} SKIP ${product.name}`)
+        continue
+      }
+
       const { buffer, mimetype } = await downloadImage(product.imageUrl)
       const embedding = await getEmbedding(buffer, mimetype)
       await upsertProduct(product.id, embedding, {
@@ -45,6 +53,6 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   }
 
   console.log(
-    `[IMPORT] Done. Total: ${products.length} | Success: ${success} | Failed: ${failed}`,
+    `[IMPORT] Done. Total: ${products.length} | New: ${success} | Skipped: ${skipped} | Failed: ${failed}`,
   )
 }

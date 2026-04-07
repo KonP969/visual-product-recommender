@@ -27,6 +27,12 @@ export interface SearchResultItem {
   metadata: ProductMetadata
 }
 
+export async function productExists(id: string): Promise<boolean> {
+  const col = await getCollection()
+  const result = await col.get({ ids: [id] })
+  return result.ids.length > 0
+}
+
 export async function upsertProduct(
   id: string,
   embedding: number[],
