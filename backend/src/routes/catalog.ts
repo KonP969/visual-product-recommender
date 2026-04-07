@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getProductCount, listProducts } from '../services/chromaService'
+import { getProductCount, listProducts, getProductEmbedding } from '../services/chromaService'
 
 export const catalogRouter = Router()
 
@@ -7,6 +7,19 @@ catalogRouter.get('/catalog/stats', async (_req, res, next) => {
   try {
     const count = await getProductCount()
     res.json({ count })
+  } catch (err) {
+    next(err)
+  }
+})
+
+catalogRouter.get('/catalog/embedding/:id', async (req, res, next) => {
+  try {
+    const result = await getProductEmbedding(req.params.id)
+    if (!result) {
+      res.status(404).json({ error: 'Product not found' })
+      return
+    }
+    res.json(result)
   } catch (err) {
     next(err)
   }

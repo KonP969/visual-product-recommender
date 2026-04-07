@@ -76,6 +76,18 @@ export async function searchSimilar(
   }
 }
 
+export async function getProductEmbedding(
+  id: string,
+): Promise<{ metadata: ProductMetadata; embedding: number[] } | null> {
+  const col = await getCollection()
+  const result = await col.get({ ids: [id], include: ['metadatas', 'embeddings'] })
+  if (result.ids.length === 0) return null
+  return {
+    metadata: result.metadatas[0] as unknown as ProductMetadata,
+    embedding: result.embeddings![0] as number[],
+  }
+}
+
 export async function listProducts(
   limit: number = 20,
   offset: number = 0,
