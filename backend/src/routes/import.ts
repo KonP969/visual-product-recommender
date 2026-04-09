@@ -23,15 +23,28 @@ importRouter.post('/import', async (req, res, next) => {
 
     const parsedLimit = limit ? Math.max(1, Math.floor(Number(limit))) : undefined
 
-    res.json({
-      message: 'Import started',
-      source,
-      limit: parsedLimit ?? 'all',
-    })
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.flushHeaders()
 
-    runImport(source, { limit: parsedLimit }).catch((err: Error) => {
-      console.error('[IMPORT ERROR]', err.stack)
-    })
+    const send = (data: object) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`)
+    }
+
+    try {
+      const result = await runImport(source, {
+        limit: parsedLimit,
+        onProgress: (p) => send({ type: 'progress', ...p }),
+      })
+      send({ type: 'done', ...result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      send({ type: 'error', message })
+      console.error('[IMPORT ERROR]', err instanceof Error ? err.stack : err)
+    }
+
+    res.end()
   } catch (err) {
     next(err)
   }
