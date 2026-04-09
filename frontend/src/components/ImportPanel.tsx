@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Upload, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,6 +12,11 @@ interface ProgressState {
   failed: number
 }
 
+interface SSEProgress { type: 'progress'; current: number; total: number; success: number; skipped: number; failed: number }
+interface SSEDone    { type: 'done';     current: number; total: number; success: number; skipped: number; failed: number }
+interface SSEError   { type: 'error';    message: string }
+type SSEEvent = SSEProgress | SSEDone | SSEError
+
 export function ImportPanel() {
   const [open, setOpen] = useState(false)
   const [feedUrl, setFeedUrl] = useState('')
@@ -19,9 +24,13 @@ export function ImportPanel() {
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [message, setMessage] = useState('')
   const [progress, setProgress] = useState<ProgressState | null>(null)
+  const controllerRef = useRef<AbortController | null>(null)
 
   const handleImport = async () => {
     if (!feedUrl.trim()) return
+
+    const controller = new AbortController()
+    controllerRef.current = controller
 
     setStatus('loading')
     setMessage('')
@@ -35,12 +44,17 @@ export function ImportPanel() {
           feedUrl: feedUrl.trim(),
           limit: limit ? Number(limit) : undefined,
         }),
+        signal: controller.signal,
       })
 
       if (!response.ok || !response.body) {
-        const data = await response.json()
+        let errorMsg = 'Import failed'
+        try {
+          const data = await response.json()
+          errorMsg = data.error ?? errorMsg
+        } catch { /* body was not JSON */ }
         setStatus('error')
-        setMessage(data.error ?? 'Import failed')
+        setMessage(errorMsg)
         return
       }
 
@@ -59,12 +73,13 @@ export function ImportPanel() {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           try {
-            const event = JSON.parse(line.slice(6)) as { type: string } & Record<string, unknown>
+            const event = JSON.parse(line.slice(6)) as SSEEvent
             if (event.type === 'progress') {
+              const { type: _type, ...p } = event
               setStatus('importing')
-              setProgress(event as unknown as ProgressState)
+              setProgress(p)
             } else if (event.type === 'done') {
-              const p = event as unknown as ProgressState
+              const { type: _type, ...p } = event
               setStatus('success')
               setProgress(p)
               setMessage(
@@ -72,7 +87,7 @@ export function ImportPanel() {
               )
             } else if (event.type === 'error') {
               setStatus('error')
-              setMessage((event.message as string) ?? 'Import failed')
+              setMessage(event.message ?? 'Import failed')
             }
           } catch {
             // malformed SSE line — skip
