@@ -3,11 +3,20 @@ import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct, productExists } from './chromaService'
 
-export interface ImportOptions {
-  limit?: number
+export interface ImportProgress {
+  current: number
+  total: number
+  success: number
+  skipped: number
+  failed: number
 }
 
-export async function runImport(source: string, options: ImportOptions = {}): Promise<void> {
+export interface ImportOptions {
+  limit?: number
+  onProgress?: (p: ImportProgress) => void
+}
+
+export async function runImport(source: string, options: ImportOptions = {}): Promise<ImportProgress> {
   console.log(`[IMPORT] Parsing feed: ${source}`)
   const allProducts = await parseFeed(source)
 
@@ -25,34 +34,51 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
 
   for (let i = 0; i < products.length; i++) {
     const product = products[i]
-    const progress = `[${i + 1}/${products.length}]`
+    const label = `[${i + 1}/${products.length}]`
 
     try {
       const exists = await productExists(product.id)
       if (exists) {
         skipped++
-        console.log(`[IMPORT] ${progress} SKIP ${product.name}`)
-        continue
+        console.log(`[IMPORT] ${label} SKIP ${product.name}`)
+      } else {
+        const { buffer, mimetype } = await downloadImage(product.imageUrl)
+        const embedding = await getEmbedding(buffer, mimetype)
+        await upsertProduct(product.id, embedding, {
+          name: product.name,
+          price: product.price,
+          imageUrl: product.imageUrl,
+          productUrl: product.productUrl,
+        })
+        success++
+        console.log(`[IMPORT] ${label} ✓ ${product.name}`)
       }
-
-      const { buffer, mimetype } = await downloadImage(product.imageUrl)
-      const embedding = await getEmbedding(buffer, mimetype)
-      await upsertProduct(product.id, embedding, {
-        name: product.name,
-        price: product.price,
-        imageUrl: product.imageUrl,
-        productUrl: product.productUrl,
-      })
-      success++
-      console.log(`[IMPORT] ${progress} ✓ ${product.name}`)
     } catch (err) {
       failed++
       const message = err instanceof Error ? err.message : String(err)
-      console.warn(`[IMPORT] ${progress} ✗ ${product.name} — ${message}`)
+      console.warn(`[IMPORT] ${label} ✗ ${product.name} — ${message}`)
     }
+
+    options.onProgress?.({
+      current: i + 1,
+      total: products.length,
+      success,
+      skipped,
+      failed,
+    })
+  }
+
+  const result: ImportProgress = {
+    current: products.length,
+    total: products.length,
+    success,
+    skipped,
+    failed,
   }
 
   console.log(
     `[IMPORT] Done. Total: ${products.length} | New: ${success} | Skipped: ${skipped} | Failed: ${failed}`,
   )
+
+  return result
 }
