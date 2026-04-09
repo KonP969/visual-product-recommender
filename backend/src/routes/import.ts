@@ -28,8 +28,11 @@ importRouter.post('/import', async (req, res, next) => {
     res.setHeader('Connection', 'keep-alive')
     res.flushHeaders()
 
+    let aborted = false
+    req.on('close', () => { aborted = true })
+
     const send = (data: object) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`)
+      if (!aborted) res.write(`data: ${JSON.stringify(data)}\n\n`)
     }
 
     try {
