@@ -174,7 +174,7 @@ export function ImportPanel() {
               )}
             </button>
 
-            {(status === 'importing' || (status === 'success' && progress)) && progress && (
+            {progress && progress.total > 0 && (status === 'importing' || status === 'success') && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-gray-600">
                   <span>{status === 'importing' ? 'Importowanie produktów…' : 'Import zakończony'}</span>
