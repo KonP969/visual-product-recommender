@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,7 +27,18 @@ export function ImportPanel() {
   const [message, setMessage] = useState('')
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [parsedInfo, setParsedInfo] = useState<{ feedTotal: number; importCount: number } | null>(null)
+  const [elapsed, setElapsed] = useState(0)
   const controllerRef = useRef<AbortController | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (status === 'loading' || status === 'parsed' || status === 'importing') {
+      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000)
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [status])
 
   const handleImport = async () => {
     if (!feedUrl.trim()) return
@@ -39,6 +50,7 @@ export function ImportPanel() {
     setMessage('')
     setProgress(null)
     setParsedInfo(null)
+    setElapsed(0)
 
     try {
       const response = await fetch('/api/import', {
@@ -174,17 +186,17 @@ export function ImportPanel() {
               {status === 'loading' ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Pobieranie XML…
+                  Pobieranie XML… ({elapsed}s)
                 </>
               ) : status === 'parsed' ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Przygotowywanie…
+                  Przygotowywanie… ({elapsed}s)
                 </>
               ) : status === 'importing' ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Importowanie…
+                  Importowanie… ({elapsed}s)
                 </>
               ) : (
                 'Start import'
