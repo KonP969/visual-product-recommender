@@ -105,6 +105,37 @@ export async function getProductCount(): Promise<number> {
   return col.count()
 }
 
+export async function searchProductsByName(
+  query: string,
+  limit: number,
+  offset: number,
+): Promise<{ products: { id: string; metadata: ProductMetadata }[]; total: number }> {
+  const col = await getCollection()
+  const q = query.toLowerCase()
+  const BATCH = 500
+  const matched: { id: string; metadata: ProductMetadata }[] = []
+  let batchOffset = 0
+
+  while (true) {
+    const result = await col.get({ limit: BATCH, offset: batchOffset, include: ['metadatas'] })
+    if (result.ids.length === 0) break
+
+    for (let i = 0; i < result.ids.length; i++) {
+      const metadata = result.metadatas[i] as unknown as ProductMetadata
+      if (metadata.name.toLowerCase().includes(q)) {
+        matched.push({ id: result.ids[i], metadata })
+      }
+    }
+
+    batchOffset += result.ids.length
+    if (result.ids.length < BATCH) break
+  }
+
+  const total = matched.length
+  const products = matched.slice(offset, offset + limit)
+  return { products, total }
+}
+
 export async function isChromaHealthy(): Promise<boolean> {
   try {
     await client.heartbeat()
