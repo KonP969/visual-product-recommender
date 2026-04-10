@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Upload, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type ImportStatus = 'idle' | 'loading' | 'parsed' | 'importing' | 'success' | 'error'
@@ -122,10 +122,19 @@ export function ImportPanel() {
           }
         }
       }
-    } catch {
-      setStatus('error')
-      setMessage('Network error. Is the backend running?')
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setStatus('error')
+        setMessage('Import anulowany.')
+      } else {
+        setStatus('error')
+        setMessage('Network error. Is the backend running?')
+      }
     }
+  }
+
+  const handleStop = () => {
+    controllerRef.current?.abort()
   }
 
   const pct = progress && progress.total > 0
@@ -179,11 +188,12 @@ export function ImportPanel() {
               <span className="ml-2 text-xs text-gray-400">zostaw puste = cały feed</span>
             </div>
 
+            <div className="flex gap-2">
             <button
               onClick={handleImport}
               disabled={!feedUrl.trim() || isActive}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
                 feedUrl.trim() && !isActive
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'cursor-not-allowed bg-gray-100 text-gray-400',
@@ -210,6 +220,17 @@ export function ImportPanel() {
                 'Start import'
               )}
             </button>
+            {isActive && (
+              <button
+                onClick={handleStop}
+                title="Zatrzymaj import"
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+                Stop
+              </button>
+            )}
+            </div>
 
             {/* Info po sparsowaniu XML, przed startem pętli */}
             {status === 'parsed' && parsedInfo && (
