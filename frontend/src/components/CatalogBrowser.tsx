@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Database, BarChart2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Database, BarChart2, Search, X } from 'lucide-react'
 import { EmbeddingModal } from './EmbeddingModal'
 
 interface Product {
@@ -21,6 +21,24 @@ interface CatalogResponse {
 
 const PAGE_SIZE = 20
 
+function getPageRange(current: number, total: number): (number | null)[] {
+  if (total <= 1) return [0]
+  const pages = new Set<number>()
+  pages.add(0)
+  pages.add(total - 1)
+  pages.add(current)
+  if (current - 1 >= 0) pages.add(current - 1)
+  if (current + 1 < total) pages.add(current + 1)
+
+  const sorted = Array.from(pages).sort((a, b) => a - b)
+  const result: (number | null)[] = []
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push(null)
+    result.push(sorted[i])
+  }
+  return result
+}
+
 export function CatalogBrowser() {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(0)
@@ -28,13 +46,17 @@ export function CatalogBrowser() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [embeddingProductId, setEmbeddingProductId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')       // input value (immediate)
+  const [debouncedQuery, setDebouncedQuery] = useState('') // sent to API (debounced)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchPage = useCallback(async (pageIndex: number) => {
+  const fetchPage = useCallback(async (pageIndex: number, q: string) => {
     setLoading(true)
     setError('')
     try {
+      const qParam = q ? `&q=${encodeURIComponent(q)}` : ''
       const res = await fetch(
-        `/api/catalog/list?limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}`,
+        `/api/catalog/list?limit=${PAGE_SIZE}&offset=${pageIndex * PAGE_SIZE}${qParam}`,
       )
       if (!res.ok) throw new Error('Failed to load catalog')
       setData(await res.json())
@@ -46,8 +68,17 @@ export function CatalogBrowser() {
   }, [])
 
   useEffect(() => {
-    if (open) fetchPage(page)
-  }, [open, page, fetchPage])
+    if (open) fetchPage(page, debouncedQuery)
+  }, [open, page, debouncedQuery, fetchPage])
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setPage(0)
+      setDebouncedQuery(value)
+    }, 300)
+  }
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
 
@@ -72,6 +103,35 @@ export function CatalogBrowser() {
 
         {open && (
           <div className="border-t border-gray-100">
+            <div className="px-4 pt-3 pb-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Szukaj po nazwie…"
+                  className="w-full rounded-lg border border-gray-200 pl-8 pr-8 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => handleSearchChange('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {searchQuery && data && data.total > 0 && (
+                <p className="mt-1.5 text-xs text-gray-500">
+                  {data.total} {data.total === 1 ? 'wynik' : 'wyników'} dla „{searchQuery}"
+                </p>
+              )}
+              {searchQuery && data && data.total === 0 && (
+                <p className="mt-2 text-sm text-gray-400">Brak produktów pasujących do „{searchQuery}"</p>
+              )}
+            </div>
+
             {error && (
               <p className="px-4 py-3 text-sm text-red-500">{error}</p>
             )}
@@ -80,7 +140,7 @@ export function CatalogBrowser() {
               <p className="px-4 py-3 text-sm text-gray-400">Ładowanie…</p>
             )}
 
-            {!loading && data && (
+            {!loading && data && data.products.length > 0 && (
               <>
                 <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {data.products.map((p) => (
@@ -128,28 +188,41 @@ export function CatalogBrowser() {
                 </div>
 
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-                    <span className="text-xs text-gray-400">
-                      Strona {page + 1} z {totalPages}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setPage((p) => p - 1)}
-                        disabled={page === 0}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40 hover:bg-gray-50"
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                        Poprzednia
-                      </button>
-                      <button
-                        onClick={() => setPage((p) => p + 1)}
-                        disabled={page >= totalPages - 1}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40 hover:bg-gray-50"
-                      >
-                        Następna
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-center gap-1 border-t border-gray-100 px-4 py-3 flex-wrap">
+                    <button
+                      onClick={() => setPage((p) => p - 1)}
+                      disabled={page === 0}
+                      className="flex items-center rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+
+                    {getPageRange(page, totalPages).map((p, i) =>
+                      p === null ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-400 select-none">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={[
+                            'rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                            p === page
+                              ? 'border-blue-500 bg-blue-500 text-white font-medium'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+                          ].join(' ')}
+                        >
+                          {p + 1}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      onClick={() => setPage((p) => p + 1)}
+                      disabled={page >= totalPages - 1}
+                      className="flex items-center rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 )}
               </>
