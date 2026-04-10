@@ -1,5 +1,5 @@
-import { parseStringPromise } from 'xml2js'
-import { readFile } from 'fs/promises'
+import sax from 'sax'
+import { createReadStream } from 'fs'
 import axios from 'axios'
 
 export interface FeedProduct {
@@ -10,76 +10,178 @@ export interface FeedProduct {
   productUrl?: string
 }
 
-async function fetchXml(source: string): Promise<string> {
-  if (source.startsWith('http://') || source.startsWith('https://')) {
-    const response = await axios.get<string>(source, {
-      responseType: 'text',
-      timeout: 30_000,
-      headers: { 'User-Agent': 'VisualProductRecommender/1.0' },
+export interface StreamParseOptions {
+  limit?: number
+  /** Wywoływane co ~100 znalezionych produktów podczas parsowania */
+  onProgress?: (found: number) => void
+}
+
+type FeedFormat = 'ceneo' | 'rss' | 'atom'
+
+function buildProduct(
+  data: Record<string, string>,
+  format: FeedFormat,
+  fallbackId: string,
+): FeedProduct | null {
+  if (format === 'ceneo') {
+    const name = data['name']
+    const imageUrl = data['url_img']
+    if (!name || !imageUrl) return null
+    return {
+      id: data['external_id'] ?? fallbackId,
+      name,
+      imageUrl,
+      price: data['price'] ?? '—',
+      productUrl: data['url_product'],
+    }
+  }
+
+  // rss (Google Merchant) or atom
+  const name = data['g:title'] ?? data['title']
+  const imageUrl = data['g:image_link'] ?? data['image_link']
+  if (!name || !imageUrl) return null
+  return {
+    id: data['g:id'] ?? data['id'] ?? fallbackId,
+    name,
+    imageUrl,
+    price: data['g:price'] ?? data['price'] ?? '—',
+    productUrl: data['g:link'] ?? data['link'],
+  }
+}
+
+/**
+ * Strumieniowy parser XML feedu.
+ * Zatrzymuje pobieranie po znalezieniu `limit` produktów (wczesne wyjście).
+ * Zwraca { products, stoppedEarly } — gdy stoppedEarly=true, feedTotal jest nieznany.
+ */
+export function parseFeedStreaming(
+  source: string,
+  options: StreamParseOptions = {},
+): Promise<{ products: FeedProduct[]; stoppedEarly: boolean }> {
+  const { limit, onProgress } = options
+
+  return new Promise((resolve, reject) => {
+    const products: FeedProduct[] = []
+    let stoppedEarly = false
+    let resolved = false
+    let destroyStream: (() => void) | null = null
+
+    let format: FeedFormat | null = null
+    let inOffers = false   // dla formatu Ceneo
+    let inProduct = false
+    let currentData: Record<string, string> = {}
+    let textBuf = ''
+
+    const finish = () => {
+      if (resolved) return
+      resolved = true
+      destroyStream?.()
+      resolve({ products, stoppedEarly })
+    }
+
+    // lowercase:true → tagi małymi literami, ale g:title pozostaje g:title
+    const saxStream = sax.createStream(false, { lowercase: true, trim: false })
+
+    saxStream.on('opentag', (node) => {
+      const name = (node as sax.Tag).name
+
+      // Wykrywanie formatu
+      if (!format) {
+        if (name === 'offers') format = 'ceneo'
+        else if (name === 'rss') format = 'rss'
+        else if (name === 'feed') format = 'atom'
+      }
+
+      if (format === 'ceneo' && name === 'offers') inOffers = true
+
+      const isProductTag =
+        (format === 'ceneo' && name === 'o' && inOffers) ||
+        (format === 'rss' && name === 'item') ||
+        (format === 'atom' && name === 'entry')
+
+      if (isProductTag && !inProduct) {
+        inProduct = true
+        currentData = {}
+        // Ceneo: external_id bywa atrybutem <o id="123">
+        const attrs = (node as sax.Tag).attributes as Record<string, string>
+        if (attrs['id']) currentData['external_id'] = attrs['id']
+      }
+
+      textBuf = ''
     })
-    return response.data
-  }
-  return readFile(source, 'utf-8')
-}
 
-function str(val: unknown): string | undefined {
-  if (typeof val === 'string') return val
-  if (val && typeof val === 'object' && '_' in val) return (val as { _: string })._
-  return undefined
-}
+    saxStream.on('text', (text) => {
+      if (inProduct) textBuf += text
+    })
 
-function extractProducts(parsed: Record<string, unknown>): FeedProduct[] {
-  // Format: <offers><o>...</o></offers>  (Ceneo / custom)
-  const offersRoot = parsed?.offers as Record<string, unknown> | undefined
-  if (offersRoot) {
-    const rawItems = offersRoot.o ?? []
-    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
-    return (items as Record<string, unknown>[])
-      .map((item, idx): FeedProduct | null => {
-        const name = str(item.name)
-        const imageUrl = str(item.url_img)
-        if (!name || !imageUrl) return null
-        return {
-          id: str(item.external_id) ?? String(idx),
-          name,
-          imageUrl,
-          price: str(item.price) ?? '—',
-          productUrl: str(item.url_product),
+    saxStream.on('cdata', (cdata) => {
+      if (inProduct) textBuf += cdata
+    })
+
+    saxStream.on('closetag', (name) => {
+      const isProductTag =
+        (format === 'ceneo' && name === 'o') ||
+        (format === 'rss' && name === 'item') ||
+        (format === 'atom' && name === 'entry')
+
+      if (format === 'ceneo' && name === 'offers') inOffers = false
+
+      if (inProduct) {
+        if (!isProductTag && textBuf.trim()) {
+          // Zapisz wartość pola (np. <name>, <g:title>, …)
+          currentData[name] = textBuf.trim()
         }
-      })
-      .filter((p): p is FeedProduct => p !== null)
-  }
 
-  // Format: <rss><channel><item>...</item></channel></rss>  (Google Merchant)
-  const rssChannel = (parsed?.rss as Record<string, unknown>)?.channel as Record<string, unknown> | undefined
-  // Format: <feed><entry>...</entry></feed>  (Atom)
-  const atomFeed = parsed?.feed as Record<string, unknown> | undefined
-  const channel = rssChannel ?? atomFeed
-
-  if (channel) {
-    const rawItems = channel.item ?? channel.entry ?? []
-    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
-    return (items as Record<string, unknown>[])
-      .map((item, idx): FeedProduct | null => {
-        const name = str(item['g:title']) ?? str(item.title)
-        const imageUrl = str(item['g:image_link']) ?? str(item.image_link)
-        if (!name || !imageUrl) return null
-        return {
-          id: str(item['g:id']) ?? str(item.id) ?? String(idx),
-          name,
-          imageUrl,
-          price: str(item['g:price']) ?? str(item.price) ?? '—',
-          productUrl: str(item['g:link']) ?? str(item.link),
+        if (isProductTag) {
+          inProduct = false
+          const product = buildProduct(currentData, format!, String(products.length))
+          if (product) {
+            products.push(product)
+            if (products.length % 100 === 0) onProgress?.(products.length)
+            if (limit && products.length >= limit) {
+              stoppedEarly = true
+              finish()
+              return
+            }
+          }
+          currentData = {}
         }
-      })
-      .filter((p): p is FeedProduct => p !== null)
-  }
+      }
 
-  return []
-}
+      textBuf = ''
+    })
 
-export async function parseFeed(source: string): Promise<FeedProduct[]> {
-  const xml = await fetchXml(source)
-  const parsed = await parseStringPromise(xml, { explicitArray: false })
-  return extractProducts(parsed as Record<string, unknown>)
+    saxStream.on('error', () => {
+      // Ignoruj błędy parsowania (np. encje HTML) i kontynuuj
+      ;(saxStream as unknown as { _parser: { error: null; resume: () => void } })._parser.error = null
+      ;(saxStream as unknown as { _parser: { resume: () => void } })._parser.resume()
+    })
+
+    saxStream.on('end', finish)
+
+    // Uruchom strumień
+    if (source.startsWith('http://') || source.startsWith('https://')) {
+      axios
+        .get<import('stream').Readable>(source, {
+          responseType: 'stream',
+          timeout: 120_000,
+          headers: { 'User-Agent': 'VisualProductRecommender/1.0' },
+        })
+        .then((response) => {
+          destroyStream = () => {
+            try { response.data.destroy() } catch { /* ignore */ }
+          }
+          response.data.on('error', reject)
+          response.data.pipe(saxStream)
+        })
+        .catch(reject)
+    } else {
+      const fileStream = createReadStream(source)
+      destroyStream = () => {
+        try { fileStream.destroy() } catch { /* ignore */ }
+      }
+      fileStream.on('error', reject)
+      fileStream.pipe(saxStream)
+    }
+  })
 }

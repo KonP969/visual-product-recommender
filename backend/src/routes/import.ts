@@ -38,6 +38,7 @@ importRouter.post('/import', async (req, res, next) => {
     try {
       const result = await runImport(source, {
         limit: parsedLimit,
+        onParseProgress: (found) => send({ type: 'parsing', found }),
         onParsed: (feedTotal, importCount) => send({ type: 'parsed', feedTotal, importCount }),
         onProgress: (p) => send({ type: 'progress', ...p }),
       })

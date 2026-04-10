@@ -1,4 +1,4 @@
-import { parseFeed } from './feedParser'
+import { parseFeedStreaming } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct, productExists } from './chromaService'
@@ -6,7 +6,7 @@ import { upsertProduct, productExists } from './chromaService'
 export interface ImportProgress {
   current: number
   total: number      // products being imported (after limit applied)
-  feedTotal: number  // all products parsed from the XML
+  feedTotal: number | null  // all products in XML — null when stopped early
   success: number
   skipped: number
   failed: number
@@ -14,23 +14,29 @@ export interface ImportProgress {
 
 export interface ImportOptions {
   limit?: number
-  onParsed?: (feedTotal: number, importCount: number) => void
+  /** Co ~100 znalezionych podczas parsowania XML */
+  onParseProgress?: (found: number) => void
+  /** Po zakończeniu parsowania, przed startem pętli importu */
+  onParsed?: (feedTotal: number | null, importCount: number) => void
   onProgress?: (p: ImportProgress) => void
 }
 
 export async function runImport(source: string, options: ImportOptions = {}): Promise<ImportProgress> {
-  console.log(`[IMPORT] Parsing feed: ${source}`)
-  const allProducts = await parseFeed(source)
+  console.log(`[IMPORT] Streaming parse: ${source}`)
 
-  const products = options.limit
-    ? allProducts.slice(0, options.limit)
-    : allProducts
+  const { products, stoppedEarly } = await parseFeedStreaming(source, {
+    limit: options.limit,
+    onProgress: options.onParseProgress,
+  })
+
+  const feedTotal = stoppedEarly ? null : products.length
 
   console.log(
-    `[IMPORT] Found ${allProducts.length} products, importing ${products.length}`,
+    `[IMPORT] Parsed ${products.length} products` +
+    (stoppedEarly ? ' (stopped at limit)' : ` (feed total: ${products.length})`),
   )
 
-  options.onParsed?.(allProducts.length, products.length)
+  options.onParsed?.(feedTotal, products.length)
 
   let success = 0
   let skipped = 0
@@ -66,7 +72,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
     options.onProgress?.({
       current: i + 1,
       total: products.length,
-      feedTotal: allProducts.length,
+      feedTotal,
       success,
       skipped,
       failed,
@@ -76,7 +82,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   const result: ImportProgress = {
     current: products.length,
     total: products.length,
-    feedTotal: allProducts.length,
+    feedTotal,
     success,
     skipped,
     failed,

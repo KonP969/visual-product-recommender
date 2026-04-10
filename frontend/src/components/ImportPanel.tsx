@@ -7,17 +7,18 @@ type ImportStatus = 'idle' | 'loading' | 'parsed' | 'importing' | 'success' | 'e
 interface ProgressState {
   current: number
   total: number
-  feedTotal: number
+  feedTotal: number | null
   success: number
   skipped: number
   failed: number
 }
 
-interface SSEParsed   { type: 'parsed';   feedTotal: number; importCount: number }
-interface SSEProgress { type: 'progress'; current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
-interface SSEDone     { type: 'done';     current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
+interface SSEParsing  { type: 'parsing';  found: number }
+interface SSEParsed   { type: 'parsed';   feedTotal: number | null; importCount: number }
+interface SSEProgress { type: 'progress'; current: number; total: number; feedTotal: number | null; success: number; skipped: number; failed: number }
+interface SSEDone     { type: 'done';     current: number; total: number; feedTotal: number | null; success: number; skipped: number; failed: number }
 interface SSEError    { type: 'error';    message: string }
-type SSEEvent = SSEParsed | SSEProgress | SSEDone | SSEError
+type SSEEvent = SSEParsing | SSEParsed | SSEProgress | SSEDone | SSEError
 
 export function ImportPanel() {
   const [open, setOpen] = useState(false)
@@ -26,7 +27,8 @@ export function ImportPanel() {
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [message, setMessage] = useState('')
   const [progress, setProgress] = useState<ProgressState | null>(null)
-  const [parsedInfo, setParsedInfo] = useState<{ feedTotal: number; importCount: number } | null>(null)
+  const [parsedInfo, setParsedInfo] = useState<{ feedTotal: number | null; importCount: number } | null>(null)
+  const [parsingFound, setParsingFound] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const controllerRef = useRef<AbortController | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -50,6 +52,7 @@ export function ImportPanel() {
     setMessage('')
     setProgress(null)
     setParsedInfo(null)
+    setParsingFound(0)
     setElapsed(0)
 
     try {
@@ -90,7 +93,10 @@ export function ImportPanel() {
           if (!line.startsWith('data: ')) continue
           try {
             const event = JSON.parse(line.slice(6)) as SSEEvent
-            if (event.type === 'parsed') {
+            if (event.type === 'parsing') {
+              setStatus('loading')
+              setParsingFound(event.found)
+            } else if (event.type === 'parsed') {
               setStatus('parsed')
               setParsedInfo({ feedTotal: event.feedTotal, importCount: event.importCount })
             } else if (event.type === 'progress') {
@@ -101,11 +107,11 @@ export function ImportPanel() {
               const { type: _type, ...p } = event
               setStatus('success')
               setProgress(p)
-              const pctOfFeed = p.feedTotal > 0
-                ? ` (${Math.round((p.total / p.feedTotal) * 100)}% feedu)`
+              const feedInfo = p.feedTotal !== null
+                ? ` z ${p.feedTotal} w feedzie (${Math.round((p.total / p.feedTotal) * 100)}%)`
                 : ''
               setMessage(
-                `Zaimportowano ${p.total} z ${p.feedTotal} produktów feedu${pctOfFeed} — ${p.success} nowych, ${p.skipped} pominiętych, ${p.failed} błędów.`,
+                `Zaimportowano ${p.total}${feedInfo} — ${p.success} nowych, ${p.skipped} pominiętych, ${p.failed} błędów.`,
               )
             } else if (event.type === 'error') {
               setStatus('error')
@@ -186,7 +192,9 @@ export function ImportPanel() {
               {status === 'loading' ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Pobieranie XML… ({elapsed}s)
+                  {parsingFound > 0
+                    ? `Parsowanie XML… ${parsingFound} produktów (${elapsed}s)`
+                    : `Pobieranie XML… (${elapsed}s)`}
                 </>
               ) : status === 'parsed' ? (
                 <>
@@ -206,8 +214,11 @@ export function ImportPanel() {
             {/* Info po sparsowaniu XML, przed startem pętli */}
             {status === 'parsed' && parsedInfo && (
               <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                XML sparsowany — znaleziono <strong>{parsedInfo.feedTotal}</strong> produktów w feedzie.
-                Do importu: <strong>{parsedInfo.importCount}</strong>. Trwa generowanie embeddingów…
+                {parsedInfo.feedTotal !== null
+                  ? <>XML sparsowany — znaleziono <strong>{parsedInfo.feedTotal}</strong> produktów w feedzie. Do importu: <strong>{parsedInfo.importCount}</strong>.</>
+                  : <>Znaleziono <strong>{parsedInfo.importCount}</strong> produktów (limit osiągnięty, pobieranie zatrzymane).</>
+                }
+                {' '}Trwa generowanie embeddingów…
               </div>
             )}
 
