@@ -7,13 +7,14 @@ type ImportStatus = 'idle' | 'loading' | 'importing' | 'success' | 'error'
 interface ProgressState {
   current: number
   total: number
+  feedTotal: number
   success: number
   skipped: number
   failed: number
 }
 
-interface SSEProgress { type: 'progress'; current: number; total: number; success: number; skipped: number; failed: number }
-interface SSEDone    { type: 'done';     current: number; total: number; success: number; skipped: number; failed: number }
+interface SSEProgress { type: 'progress'; current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
+interface SSEDone    { type: 'done';     current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
 interface SSEError   { type: 'error';    message: string }
 type SSEEvent = SSEProgress | SSEDone | SSEError
 
@@ -82,8 +83,11 @@ export function ImportPanel() {
               const { type: _type, ...p } = event
               setStatus('success')
               setProgress(p)
+              const pctOfFeed = p.feedTotal > 0
+                ? ` (${Math.round((p.total / p.feedTotal) * 100)}% feedu)`
+                : ''
               setMessage(
-                `Import zakończony — ${p.total} produktów: ${p.success} nowych, ${p.skipped} pominiętych, ${p.failed} błędów.`,
+                `Zaimportowano ${p.total} z ${p.feedTotal} produktów feedu${pctOfFeed} — ${p.success} nowych, ${p.skipped} pominiętych, ${p.failed} błędów.`,
               )
             } else if (event.type === 'error') {
               setStatus('error')
@@ -177,7 +181,11 @@ export function ImportPanel() {
             {progress && progress.total > 0 && (status === 'importing' || status === 'success') && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>{status === 'importing' ? 'Importowanie produktów…' : 'Import zakończony'}</span>
+                  <span>
+                    {status === 'importing'
+                      ? `Importowanie ${progress.total} z ${progress.feedTotal} w XML…`
+                      : 'Import zakończony'}
+                  </span>
                   <span className="font-medium">{pct}%</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
