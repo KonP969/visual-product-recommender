@@ -14,6 +14,7 @@ export interface ImportProgress {
 
 export interface ImportOptions {
   limit?: number
+  onParsed?: (feedTotal: number, importCount: number) => void
   onProgress?: (p: ImportProgress) => void
 }
 
@@ -28,6 +29,8 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   console.log(
     `[IMPORT] Found ${allProducts.length} products, importing ${products.length}`,
   )
+
+  options.onParsed?.(allProducts.length, products.length)
 
   let success = 0
   let skipped = 0

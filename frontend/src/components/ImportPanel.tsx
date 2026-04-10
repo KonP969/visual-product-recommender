@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { Upload, ChevronDown, ChevronUp, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type ImportStatus = 'idle' | 'loading' | 'importing' | 'success' | 'error'
+type ImportStatus = 'idle' | 'loading' | 'parsed' | 'importing' | 'success' | 'error'
 
 interface ProgressState {
   current: number
@@ -13,10 +13,11 @@ interface ProgressState {
   failed: number
 }
 
+interface SSEParsed   { type: 'parsed';   feedTotal: number; importCount: number }
 interface SSEProgress { type: 'progress'; current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
-interface SSEDone    { type: 'done';     current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
-interface SSEError   { type: 'error';    message: string }
-type SSEEvent = SSEProgress | SSEDone | SSEError
+interface SSEDone     { type: 'done';     current: number; total: number; feedTotal: number; success: number; skipped: number; failed: number }
+interface SSEError    { type: 'error';    message: string }
+type SSEEvent = SSEParsed | SSEProgress | SSEDone | SSEError
 
 export function ImportPanel() {
   const [open, setOpen] = useState(false)
@@ -25,6 +26,7 @@ export function ImportPanel() {
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [message, setMessage] = useState('')
   const [progress, setProgress] = useState<ProgressState | null>(null)
+  const [parsedInfo, setParsedInfo] = useState<{ feedTotal: number; importCount: number } | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
 
   const handleImport = async () => {
@@ -36,6 +38,7 @@ export function ImportPanel() {
     setStatus('loading')
     setMessage('')
     setProgress(null)
+    setParsedInfo(null)
 
     try {
       const response = await fetch('/api/import', {
@@ -75,7 +78,10 @@ export function ImportPanel() {
           if (!line.startsWith('data: ')) continue
           try {
             const event = JSON.parse(line.slice(6)) as SSEEvent
-            if (event.type === 'progress') {
+            if (event.type === 'parsed') {
+              setStatus('parsed')
+              setParsedInfo({ feedTotal: event.feedTotal, importCount: event.importCount })
+            } else if (event.type === 'progress') {
               const { type: _type, ...p } = event
               setStatus('importing')
               setProgress(p)
@@ -107,6 +113,8 @@ export function ImportPanel() {
   const pct = progress && progress.total > 0
     ? Math.round((progress.current / progress.total) * 100)
     : 0
+
+  const isActive = status === 'loading' || status === 'parsed' || status === 'importing'
 
   return (
     <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white">
@@ -155,10 +163,10 @@ export function ImportPanel() {
 
             <button
               onClick={handleImport}
-              disabled={!feedUrl.trim() || status === 'loading' || status === 'importing'}
+              disabled={!feedUrl.trim() || isActive}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-                feedUrl.trim() && status !== 'loading' && status !== 'importing'
+                feedUrl.trim() && !isActive
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'cursor-not-allowed bg-gray-100 text-gray-400',
               )}
@@ -167,6 +175,11 @@ export function ImportPanel() {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Pobieranie XML…
+                </>
+              ) : status === 'parsed' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Przygotowywanie…
                 </>
               ) : status === 'importing' ? (
                 <>
@@ -177,6 +190,14 @@ export function ImportPanel() {
                 'Start import'
               )}
             </button>
+
+            {/* Info po sparsowaniu XML, przed startem pętli */}
+            {status === 'parsed' && parsedInfo && (
+              <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                XML sparsowany — znaleziono <strong>{parsedInfo.feedTotal}</strong> produktów w feedzie.
+                Do importu: <strong>{parsedInfo.importCount}</strong>. Trwa generowanie embeddingów…
+              </div>
+            )}
 
             {progress && progress.total > 0 && (status === 'importing' || status === 'success') && (
               <div className="flex flex-col gap-2">
