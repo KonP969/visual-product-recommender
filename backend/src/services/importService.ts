@@ -5,7 +5,8 @@ import { upsertProduct, productExists } from './chromaService'
 
 export interface ImportProgress {
   current: number
-  total: number
+  total: number      // products being imported (after limit applied)
+  feedTotal: number  // all products parsed from the XML
   success: number
   skipped: number
   failed: number
@@ -62,6 +63,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
     options.onProgress?.({
       current: i + 1,
       total: products.length,
+      feedTotal: allProducts.length,
       success,
       skipped,
       failed,
@@ -71,6 +73,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   const result: ImportProgress = {
     current: products.length,
     total: products.length,
+    feedTotal: allProducts.length,
     success,
     skipped,
     failed,
