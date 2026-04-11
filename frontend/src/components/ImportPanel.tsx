@@ -32,6 +32,7 @@ export function ImportPanel() {
   const [elapsed, setElapsed] = useState(0)
   const controllerRef = useRef<AbortController | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const importStartElapsedRef = useRef<number>(0)
 
   useEffect(() => {
     if (status === 'loading' || status === 'parsed' || status === 'importing') {
@@ -101,6 +102,9 @@ export function ImportPanel() {
               setParsedInfo({ feedTotal: event.feedTotal, importCount: event.importCount })
             } else if (event.type === 'progress') {
               const { type: _type, ...p } = event
+              if (status !== 'importing') {
+                importStartElapsedRef.current = elapsed
+              }
               setStatus('importing')
               setProgress(p)
             } else if (event.type === 'done') {
@@ -142,6 +146,30 @@ export function ImportPanel() {
     : 0
 
   const isActive = status === 'loading' || status === 'parsed' || status === 'importing'
+
+  const formatEta = (sec: number | null): string => {
+    if (sec === null || sec < 2) return ''
+    if (sec < 60) return `~${Math.round(sec)}s`
+    const min = Math.floor(sec / 60)
+    const s = Math.round(sec % 60)
+    return s > 0 ? `~${min}m ${s}s` : `~${min}m`
+  }
+
+  // ETA parsowania
+  const parseRate = elapsed > 1 && parsingFound > 0 ? parsingFound / elapsed : 0
+  const parseLimitNum = limit ? Number(limit) : null
+  const parseEta = parseRate > 0 && parseLimitNum && parseLimitNum > parsingFound
+    ? formatEta((parseLimitNum - parsingFound) / parseRate)
+    : ''
+
+  // ETA importu
+  const importElapsed = elapsed - importStartElapsedRef.current
+  const importRate = importElapsed > 1 && progress && progress.current > 0
+    ? progress.current / importElapsed
+    : 0
+  const importEta = importRate > 0 && progress
+    ? formatEta((progress.total - progress.current) / importRate)
+    : ''
 
   return (
     <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white">
@@ -203,7 +231,7 @@ export function ImportPanel() {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   {parsingFound > 0
-                    ? `Parsowanie XML… ${parsingFound} produktów (${elapsed}s)`
+                    ? `Parsowanie XML… ${parsingFound} produktów (${elapsed}s${parseEta ? `, zostało ${parseEta}` : ''})`
                     : `Pobieranie XML… (${elapsed}s)`}
                 </>
               ) : status === 'parsed' ? (
@@ -214,7 +242,7 @@ export function ImportPanel() {
               ) : status === 'importing' ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Importowanie… ({elapsed}s)
+                  Importowanie… ({elapsed}s{importEta ? `, zostało ${importEta}` : ''})
                 </>
               ) : (
                 'Start import'
@@ -264,6 +292,11 @@ export function ImportPanel() {
                 </div>
                 <div className="text-xs text-gray-500 text-center">
                   {progress.current} / {progress.total} produktów
+                  {status === 'importing' && importRate > 0 && (
+                    <span className="ml-2 text-gray-400">
+                      ({importRate.toFixed(1)}/s{importEta ? ` · zostało ${importEta}` : ''})
+                    </span>
+                  )}
                 </div>
                 <div className="flex justify-center gap-4 text-xs">
                   <span className="text-green-600">✓ Nowe: {progress.success}</span>
