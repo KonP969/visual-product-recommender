@@ -137,7 +137,11 @@ export function parseFeedStreaming(
           const product = buildProduct(currentData, format!, String(products.length))
           if (product) {
             products.push(product)
-            if (products.length % 100 === 0) onProgress?.(products.length)
+            // Odpala przy pierwszym produkcie, potem co 10% limitu (min co 1, max co 100)
+            const every = limit ? Math.max(1, Math.floor(limit / 10)) : 100
+            if (products.length === 1 || products.length % every === 0) {
+              onProgress?.(products.length)
+            }
             if (limit && products.length >= limit) {
               stoppedEarly = true
               finish()
@@ -165,7 +169,11 @@ export function parseFeedStreaming(
         .get<import('stream').Readable>(source, {
           responseType: 'stream',
           timeout: 120_000,
-          headers: { 'User-Agent': 'VisualProductRecommender/1.0' },
+          headers: {
+            'User-Agent': 'VisualProductRecommender/1.0',
+            'Accept-Encoding': 'identity', // wyłącz gzip — SAX potrzebuje czystego XML
+          },
+          decompress: false,
         })
         .then((response) => {
           destroyStream = () => {
