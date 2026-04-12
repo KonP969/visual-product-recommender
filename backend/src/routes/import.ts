@@ -26,13 +26,25 @@ importRouter.post('/import', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
     res.flushHeaders()
 
+    // Wyłącz Nagle algorithm — wymuś natychmiastowe wysyłanie małych pakietów
+    if ((res as unknown as { socket?: { setNoDelay?: (v: boolean) => void } }).socket?.setNoDelay) {
+      (res as unknown as { socket: { setNoDelay: (v: boolean) => void } }).socket.setNoDelay(true)
+    }
+
     let aborted = false
-    req.on('close', () => { aborted = true })
+    res.on('close', () => { aborted = true })
 
     const send = (data: object) => {
-      if (!aborted) res.write(`data: ${JSON.stringify(data)}\n\n`)
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`)
+        // Wymuś flush bufora — kluczowe dla SSE przez proxy Vite
+        if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
+          ;(res as unknown as { flush: () => void }).flush()
+        }
+      }
     }
 
     try {
