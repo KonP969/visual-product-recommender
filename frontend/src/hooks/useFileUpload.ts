@@ -23,7 +23,7 @@ export function useFileUpload(): UseFileUploadReturn {
     if (!ACCEPTED_TYPES.includes(newFile.type)) {
       setValidationError({
         type: 'invalid-type',
-        message: 'Please upload an image file (JPG, PNG, or WEBP).',
+        message: 'Wgraj plik graficzny (JPG, PNG lub WEBP).',
       })
       return
     }
@@ -31,7 +31,7 @@ export function useFileUpload(): UseFileUploadReturn {
     if (newFile.size > MAX_SIZE_BYTES) {
       setValidationError({
         type: 'too-large',
-        message: 'Image must be under 10 MB.',
+        message: 'Zdjęcie musi być mniejsze niż 10 MB.',
       })
       return
     }

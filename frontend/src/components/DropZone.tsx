@@ -50,7 +50,7 @@ export function DropZone({ previewUrl, validationError, onFile }: DropZoneProps)
         {previewUrl ? (
           <img
             src={previewUrl}
-            alt="Preview"
+            alt="Podgląd wgranego zdjęcia"
             className="h-full w-full rounded-2xl object-cover"
           />
         ) : (
@@ -64,10 +64,10 @@ export function DropZone({ previewUrl, validationError, onFile }: DropZoneProps)
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700">
-                Drop your image here
+                Przeciągnij zdjęcie wnętrza tutaj
               </p>
               <p className="mt-0.5 text-xs text-gray-400">
-                or click to upload · JPG, PNG, WEBP · max 10 MB
+                lub kliknij, aby wybrać · JPG, PNG, WEBP · maks. 10 MB
               </p>
             </div>
           </div>

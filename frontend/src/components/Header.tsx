@@ -7,7 +7,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-blue-500" />
           <span className="text-sm font-semibold tracking-tight text-gray-900">
-            Visual Product Recommender
+            Wizualny Doradca Drzwi
           </span>
         </div>
         <a

@@ -5,10 +5,13 @@ export interface Product {
   imageUrl: string
   productUrl?: string
   similarity: number
+  description?: string
 }
 
 export interface SearchResult {
   products: Product[]
+  description?: string
+  displayDescription?: string
   status: 'success' | 'empty-catalog' | 'low-similarity'
 }
 
@@ -24,6 +27,8 @@ export type AppState =
   | 'error'
   | 'empty-catalog'
   | 'low-similarity'
+
+export type SearchStage = 'analyzing' | 'matching'
 
 export interface FileValidationError {
   type: 'invalid-type' | 'too-large'
