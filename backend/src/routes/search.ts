@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { getTextEmbedding } from '../services/clipService'
+import { getEmbedding, getTextEmbedding } from '../services/clipService'
 import { searchSimilar, SearchResultItem } from '../services/chromaService'
 import { describeRoomForDoorMatching, describeDoorFromText, DoorDescription } from '../services/geminiService'
 
@@ -32,22 +32,22 @@ function toProducts(results: SearchResultItem[]) {
 }
 
 function buildResultPayload(
-  description: DoorDescription,
+  description: DoorDescription | null,
   results: SearchResultItem[],
   isLowSimilarity: boolean,
 ) {
   if (results.length === 0) {
     return {
       products: [],
-      description: description.clipQuery,
-      displayDescription: description.displayPl,
+      description: description?.clipQuery,
+      displayDescription: description?.displayPl,
       status: 'empty-catalog' as const,
     }
   }
   return {
     products: toProducts(results),
-    description: description.clipQuery,
-    displayDescription: description.displayPl,
+    description: description?.clipQuery,
+    displayDescription: description?.displayPl,
     status: isLowSimilarity ? ('low-similarity' as const) : ('success' as const),
   }
 }
@@ -72,11 +72,23 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     console.log(`[SEARCH] Image received: ${req.file.mimetype}, ${fileSizeKB} KB`)
 
     send({ type: 'progress', stage: 'analyzing' })
-    const description = await describeRoomForDoorMatching(req.file.buffer, req.file.mimetype)
-    console.log(`[SEARCH] Gemini: clip="${description.clipQuery}" pl="${description.displayPl}"`)
+    // Gemini being down must not take search down with it — fall back to the
+    // original image→CLIP pipeline (cross-modal, weaker but always available).
+    let description: DoorDescription | null = null
+    try {
+      description = await describeRoomForDoorMatching(req.file.buffer, req.file.mimetype)
+      console.log(`[SEARCH] Gemini: clip="${description.clipQuery}" pl="${description.displayPl}"`)
+    } catch (err) {
+      console.warn(
+        '[SEARCH] Gemini failed, falling back to image embedding:',
+        err instanceof Error ? err.message : err,
+      )
+    }
 
     send({ type: 'progress', stage: 'matching' })
-    const embedding = await getTextEmbedding(description.clipQuery)
+    const embedding = description
+      ? await getTextEmbedding(description.clipQuery)
+      : await getEmbedding(req.file.buffer, req.file.mimetype)
     const { results, isLowSimilarity } = await searchSimilar(embedding, 10)
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 

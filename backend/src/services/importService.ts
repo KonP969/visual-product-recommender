@@ -1,7 +1,7 @@
 import { parseFeedStreaming } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
-import { upsertProduct, productExists } from './chromaService'
+import { upsertProduct, productExists, categorizeDoor } from './chromaService'
 
 export interface ImportProgress {
   current: number
@@ -59,6 +59,8 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
           price: product.price,
           imageUrl: product.imageUrl,
           productUrl: product.productUrl,
+          category: categorizeDoor(product.name),
+          currency: 'PLN',
         })
         success++
         console.log(`[IMPORT] ${label} ✓ ${product.name}`)

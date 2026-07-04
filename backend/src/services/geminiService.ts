@@ -1,4 +1,6 @@
+import { createHash } from 'crypto'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { Jimp } from 'jimp'
 
 const MODEL_NAME = 'gemini-2.5-flash'
 
@@ -74,7 +76,31 @@ function getClient(): GoogleGenerativeAI {
 
 const GEMINI_TIMEOUT_MS = 30_000
 
-function parseDoorDescription(raw: string): DoorDescription {
+// Gemini free tier allows only a few hundred requests per day, so identical
+// inputs (same photo re-searched, same refinement text) must not burn quota.
+const CACHE_MAX = 200
+const imageCache = new Map<string, DoorDescription>()
+const textCache = new Map<string, DoorDescription>()
+
+function cacheGet(cache: Map<string, DoorDescription>, key: string): DoorDescription | undefined {
+  const hit = cache.get(key)
+  if (hit) {
+    // Re-insert to mark as most recently used
+    cache.delete(key)
+    cache.set(key, hit)
+  }
+  return hit
+}
+
+function cacheSet(cache: Map<string, DoorDescription>, key: string, value: DoorDescription): void {
+  if (cache.size >= CACHE_MAX) {
+    const oldest = cache.keys().next().value
+    if (oldest !== undefined) cache.delete(oldest)
+  }
+  cache.set(key, value)
+}
+
+export function parseDoorDescription(raw: string): DoorDescription {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
   const parsed = JSON.parse(cleaned) as { clip_query?: string; display_pl?: string }
   const clipQuery = parsed.clip_query?.trim()
@@ -101,21 +127,66 @@ async function generateWithTimeout(
   return parseDoorDescription(result.response.text())
 }
 
+// Downscale large photos before base64-encoding: Gemini doesn't need more than
+// ~1024px to judge room style, and smaller payloads upload noticeably faster.
+const RESIZE_THRESHOLD_BYTES = 1_500_000
+const MAX_DIMENSION = 1024
+
+async function prepareImage(
+  buffer: Buffer,
+  mimetype: string,
+): Promise<{ buffer: Buffer; mimetype: string }> {
+  if (buffer.length <= RESIZE_THRESHOLD_BYTES) {
+    return { buffer, mimetype }
+  }
+  try {
+    const image = await Jimp.read(buffer)
+    if (Math.max(image.width, image.height) > MAX_DIMENSION) {
+      image.scaleToFit({ w: MAX_DIMENSION, h: MAX_DIMENSION })
+    }
+    const resized = await image.getBuffer('image/jpeg', { quality: 85 })
+    console.log(`[GEMINI] Downscaled image ${Math.round(buffer.length / 1024)} KB -> ${Math.round(resized.length / 1024)} KB`)
+    return { buffer: Buffer.from(resized), mimetype: 'image/jpeg' }
+  } catch (err) {
+    console.warn('[GEMINI] Image downscale failed, sending original:', err instanceof Error ? err.message : err)
+    return { buffer, mimetype }
+  }
+}
+
 export async function describeRoomForDoorMatching(
   imageBuffer: Buffer,
   mimetype: string,
 ): Promise<DoorDescription> {
-  return generateWithTimeout([
+  const key = createHash('sha256').update(imageBuffer).digest('hex')
+  const cached = cacheGet(imageCache, key)
+  if (cached) {
+    console.log('[GEMINI] Image description cache hit')
+    return cached
+  }
+
+  const prepared = await prepareImage(imageBuffer, mimetype)
+  const description = await generateWithTimeout([
     { text: IMAGE_PROMPT },
     {
       inlineData: {
-        data: imageBuffer.toString('base64'),
-        mimeType: mimetype,
+        data: prepared.buffer.toString('base64'),
+        mimeType: prepared.mimetype,
       },
     },
   ])
+  cacheSet(imageCache, key, description)
+  return description
 }
 
 export async function describeDoorFromText(userQuery: string): Promise<DoorDescription> {
-  return generateWithTimeout([{ text: TEXT_PROMPT + userQuery }])
+  const key = userQuery.trim().toLowerCase()
+  const cached = cacheGet(textCache, key)
+  if (cached) {
+    console.log('[GEMINI] Text description cache hit')
+    return cached
+  }
+
+  const description = await generateWithTimeout([{ text: TEXT_PROMPT + userQuery }])
+  cacheSet(textCache, key, description)
+  return description
 }

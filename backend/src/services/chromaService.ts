@@ -21,12 +21,29 @@ export interface ProductMetadata {
   imageUrl: string
   productUrl?: string
   description?: string
+  category?: 'residential' | 'specialty'
+  currency?: string
 }
 
 export interface SearchResultItem {
   id: string
   similarity: number
   metadata: ProductMetadata
+}
+
+// Patterns that identify non-residential specialty/commercial door types by product name.
+const COMMERCIAL_DOOR_PATTERNS = [
+  /akustyczn/i,       // acoustic doors (Akustyczne, akustyczna)
+  /\d{2,}\s*db/i,     // acoustic rating (42 dB, 32 dB)
+  /\brc\s*[2-6]\b/i,  // security class (RC2, RC3, RC4)
+  /steel\s+solid/i,   // Steel SOLID brand (external steel doors)
+  /granit\s*c\b/i,    // GRANIT C brand (external security doors)
+  /extreme\s*rc/i,    // EXTREME RC (anti-burglary)
+  /przeciwpoż/i,      // fire-rated doors
+]
+
+export function categorizeDoor(name: string): 'residential' | 'specialty' {
+  return COMMERCIAL_DOOR_PATTERNS.some((p) => p.test(name)) ? 'specialty' : 'residential'
 }
 
 export async function productExists(id: string): Promise<boolean> {
@@ -46,6 +63,7 @@ export async function upsertProduct(
     embeddings: [embedding],
     metadatas: [metadata as unknown as Record<string, string>],
   })
+  nameIndex = null // new product invalidates the name-search index
 }
 
 // Cosine similarity between two L2-normalized vectors
@@ -57,7 +75,7 @@ function cosineSim(a: number[], b: number[]): number {
 
 // Maximal Marginal Relevance: picks k diverse results from a larger candidate pool.
 // lambda=1 → pure relevance; lambda=0 → pure diversity; 0.7 is a good default.
-function applyMMR(
+export function applyMMR(
   candidates: Array<SearchResultItem & { embedding: number[] }>,
   k: number,
   lambda = 0.7,
@@ -89,20 +107,30 @@ function applyMMR(
   return selected.map(({ id, similarity, metadata }) => ({ id, similarity, metadata }))
 }
 
-// Patterns that identify non-residential specialty/commercial door types by product name.
-// These are filtered out from residential interior search results.
-const COMMERCIAL_DOOR_PATTERNS = [
-  /akustyczn/i,       // acoustic doors (Akustyczne, akustyczna)
-  /\d{2,}\s*db/i,     // acoustic rating (42 dB, 32 dB)
-  /\brc\s*[2-6]\b/i,  // security class (RC2, RC3, RC4)
-  /steel\s+solid/i,   // Steel SOLID brand (external steel doors)
-  /granit\s*c\b/i,    // GRANIT C brand (external security doors)
-  /extreme\s*rc/i,    // EXTREME RC (anti-burglary)
-  /przeciwpoż/i,      // fire-rated doors
-]
+interface CandidateItem extends SearchResultItem {
+  embedding: number[]
+}
 
-function isResidentialDoor(name: string): boolean {
-  return !COMMERCIAL_DOOR_PATTERNS.some((p) => p.test(name))
+async function queryCandidates(
+  embedding: number[],
+  candidateN: number,
+  where?: Record<string, string>,
+): Promise<CandidateItem[]> {
+  const col = await getCollection()
+  const queryResults = await col.query({
+    queryEmbeddings: [embedding],
+    nResults: candidateN,
+    where,
+    include: ['embeddings', 'metadatas', 'distances'] as any,
+  })
+
+  return (queryResults.ids[0] ?? []).map((id, i) => {
+    const distance = queryResults.distances?.[0]?.[i] ?? 2
+    const similarity = Math.max(0, 1 - distance / 2)
+    const metadata = queryResults.metadatas[0][i] as unknown as ProductMetadata
+    const emb = (queryResults.embeddings?.[0]?.[i] as number[]) ?? []
+    return { id, similarity, metadata, embedding: emb }
+  })
 }
 
 export async function searchSimilar(
@@ -117,29 +145,19 @@ export async function searchSimilar(
     return { results: [], isLowSimilarity: false }
   }
 
-  // Fetch a larger candidate pool so MMR + residential filter have room to work
+  // Fetch a larger candidate pool so MMR has room to diversify
   const candidateN = Math.min(n * candidateMultiplier, count)
 
-  const queryResults = await col.query({
-    queryEmbeddings: [embedding],
-    nResults: candidateN,
-    include: ['embeddings', 'metadatas', 'distances'] as any,
-  })
+  // Native metadata filter keeps the pool clean at the DB level. Products
+  // imported before the category backfill lack the field and would be excluded
+  // by `where`, so an empty result falls back to a name-pattern post-filter.
+  let candidates = await queryCandidates(embedding, candidateN, { category: 'residential' })
+  if (candidates.length === 0) {
+    const all = await queryCandidates(embedding, candidateN)
+    candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
+  }
 
-  const allCandidates: Array<SearchResultItem & { embedding: number[] }> = (
-    queryResults.ids[0] ?? []
-  ).map((id, i) => {
-    const distance = queryResults.distances?.[0]?.[i] ?? 2
-    const similarity = Math.max(0, 1 - distance / 2)
-    const metadata = queryResults.metadatas[0][i] as unknown as ProductMetadata
-    const emb = (queryResults.embeddings?.[0]?.[i] as number[]) ?? []
-    return { id, similarity, metadata, embedding: emb }
-  })
-
-  // Filter out non-residential products before MMR so diversity picks from clean pool
-  const candidates = allCandidates.filter((c) => isResidentialDoor(c.metadata.name))
-
-  const topSimilarity = allCandidates[0]?.similarity ?? 0
+  const topSimilarity = candidates[0]?.similarity ?? 0
   const results = applyMMR(candidates, n)
 
   return {
@@ -177,34 +195,55 @@ export async function getProductCount(): Promise<number> {
   return col.count()
 }
 
+// Lightweight in-memory index so name search doesn't scan the whole collection
+// on every keystroke. Rebuilt lazily, invalidated on upsert.
+let nameIndex: Array<{ id: string; name: string }> | null = null
+
+async function getNameIndex(): Promise<Array<{ id: string; name: string }>> {
+  if (nameIndex) return nameIndex
+
+  const col = await getCollection()
+  const BATCH = 500
+  const index: Array<{ id: string; name: string }> = []
+  let offset = 0
+
+  while (true) {
+    const result = await col.get({ limit: BATCH, offset, include: ['metadatas'] })
+    if (result.ids.length === 0) break
+    for (let i = 0; i < result.ids.length; i++) {
+      const metadata = result.metadatas[i] as unknown as ProductMetadata
+      index.push({ id: result.ids[i], name: metadata.name })
+    }
+    offset += result.ids.length
+    if (result.ids.length < BATCH) break
+  }
+
+  nameIndex = index
+  return index
+}
+
 export async function searchProductsByName(
   query: string,
   limit: number,
   offset: number,
 ): Promise<{ products: { id: string; metadata: ProductMetadata }[]; total: number }> {
-  const col = await getCollection()
   const q = query.toLowerCase()
-  const BATCH = 500
-  const matched: { id: string; metadata: ProductMetadata }[] = []
-  let batchOffset = 0
+  const index = await getNameIndex()
+  const matchedIds = index.filter((e) => e.name.toLowerCase().includes(q)).map((e) => e.id)
 
-  while (true) {
-    const result = await col.get({ limit: BATCH, offset: batchOffset, include: ['metadatas'] })
-    if (result.ids.length === 0) break
+  const total = matchedIds.length
+  const pageIds = matchedIds.slice(offset, offset + limit)
+  if (pageIds.length === 0) return { products: [], total }
 
-    for (let i = 0; i < result.ids.length; i++) {
-      const metadata = result.metadatas[i] as unknown as ProductMetadata
-      if (metadata.name.toLowerCase().includes(q)) {
-        matched.push({ id: result.ids[i], metadata })
-      }
-    }
-
-    batchOffset += result.ids.length
-    if (result.ids.length < BATCH) break
-  }
-
-  const total = matched.length
-  const products = matched.slice(offset, offset + limit)
+  const col = await getCollection()
+  const result = await col.get({ ids: pageIds, include: ['metadatas'] })
+  // col.get does not guarantee input order — restore it
+  const byId = new Map(
+    result.ids.map((id, i) => [id, result.metadatas[i] as unknown as ProductMetadata]),
+  )
+  const products = pageIds
+    .filter((id) => byId.has(id))
+    .map((id) => ({ id, metadata: byId.get(id)! }))
   return { products, total }
 }
 
