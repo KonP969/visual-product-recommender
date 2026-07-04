@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import torch
 from transformers import CLIPProcessor, CLIPModel
@@ -25,6 +26,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+class TextRequest(BaseModel):
+    text: str
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_loaded": model is not None}
@@ -44,6 +49,23 @@ async def embed(file: UploadFile = File(...)):
     inputs = processor(images=image, return_tensors="pt")
     with torch.no_grad():
         features = model.get_image_features(**inputs)
+        features = features / features.norm(dim=-1, keepdim=True)
+
+    return {"embedding": features[0].tolist()}
+
+
+@app.post("/embed-text")
+async def embed_text(req: TextRequest):
+    if model is None or processor is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty text")
+
+    inputs = processor(text=[text], return_tensors="pt", padding=True, truncation=True)
+    with torch.no_grad():
+        features = model.get_text_features(**inputs)
         features = features / features.norm(dim=-1, keepdim=True)
 
     return {"embedding": features[0].tolist()}

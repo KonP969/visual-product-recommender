@@ -19,6 +19,15 @@ export async function getEmbedding(imageBuffer: Buffer, mimetype: string): Promi
   return response.data.embedding
 }
 
+export async function getTextEmbedding(text: string): Promise<number[]> {
+  const response = await axios.post<{ embedding: number[] }>(
+    `${SIDECAR_URL}/embed-text`,
+    { text },
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+  return response.data.embedding
+}
+
 export async function isSidecarHealthy(): Promise<boolean> {
   try {
     const response = await axios.get<{ status: string }>(`${SIDECAR_URL}/health`, {

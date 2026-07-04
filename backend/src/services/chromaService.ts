@@ -2,7 +2,8 @@ import { ChromaClient, Collection } from 'chromadb'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const COLLECTION_NAME = 'products'
-const LOW_SIMILARITY_THRESHOLD = 0.3
+// Calibrated for text↔text CLIP embeddings (post-reindex): good matches score 0.90+.
+const LOW_SIMILARITY_THRESHOLD = 0.85
 
 const client = new ChromaClient({ path: CHROMA_URL })
 let collection: Collection | null = null
@@ -19,6 +20,7 @@ export interface ProductMetadata {
   price: string
   imageUrl: string
   productUrl?: string
+  description?: string
 }
 
 export interface SearchResultItem {
@@ -46,9 +48,67 @@ export async function upsertProduct(
   })
 }
 
+// Cosine similarity between two L2-normalized vectors
+function cosineSim(a: number[], b: number[]): number {
+  let dot = 0
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i]
+  return dot
+}
+
+// Maximal Marginal Relevance: picks k diverse results from a larger candidate pool.
+// lambda=1 → pure relevance; lambda=0 → pure diversity; 0.7 is a good default.
+function applyMMR(
+  candidates: Array<SearchResultItem & { embedding: number[] }>,
+  k: number,
+  lambda = 0.7,
+): SearchResultItem[] {
+  const selected: Array<SearchResultItem & { embedding: number[] }> = []
+  const remaining = [...candidates]
+
+  while (selected.length < k && remaining.length > 0) {
+    let bestScore = -Infinity
+    let bestIdx = 0
+
+    for (let i = 0; i < remaining.length; i++) {
+      const relevance = remaining[i].similarity
+      const maxRedundancy =
+        selected.length > 0
+          ? Math.max(...selected.map((s) => cosineSim(remaining[i].embedding, s.embedding)))
+          : 0
+      const score = lambda * relevance - (1 - lambda) * maxRedundancy
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = i
+      }
+    }
+
+    selected.push(remaining[bestIdx])
+    remaining.splice(bestIdx, 1)
+  }
+
+  return selected.map(({ id, similarity, metadata }) => ({ id, similarity, metadata }))
+}
+
+// Patterns that identify non-residential specialty/commercial door types by product name.
+// These are filtered out from residential interior search results.
+const COMMERCIAL_DOOR_PATTERNS = [
+  /akustyczn/i,       // acoustic doors (Akustyczne, akustyczna)
+  /\d{2,}\s*db/i,     // acoustic rating (42 dB, 32 dB)
+  /\brc\s*[2-6]\b/i,  // security class (RC2, RC3, RC4)
+  /steel\s+solid/i,   // Steel SOLID brand (external steel doors)
+  /granit\s*c\b/i,    // GRANIT C brand (external security doors)
+  /extreme\s*rc/i,    // EXTREME RC (anti-burglary)
+  /przeciwpoż/i,      // fire-rated doors
+]
+
+function isResidentialDoor(name: string): boolean {
+  return !COMMERCIAL_DOOR_PATTERNS.some((p) => p.test(name))
+}
+
 export async function searchSimilar(
   embedding: number[],
   n: number = 5,
+  candidateMultiplier = 5,
 ): Promise<{ results: SearchResultItem[]; isLowSimilarity: boolean }> {
   const col = await getCollection()
   const count = await col.count()
@@ -57,19 +117,31 @@ export async function searchSimilar(
     return { results: [], isLowSimilarity: false }
   }
 
+  // Fetch a larger candidate pool so MMR + residential filter have room to work
+  const candidateN = Math.min(n * candidateMultiplier, count)
+
   const queryResults = await col.query({
     queryEmbeddings: [embedding],
-    nResults: Math.min(n, count),
+    nResults: candidateN,
+    include: ['embeddings', 'metadatas', 'distances'] as any,
   })
 
-  const results: SearchResultItem[] = (queryResults.ids[0] ?? []).map((id, i) => {
-    const distance = queryResults.distances?.[0]?.[i] ?? 1
-    const similarity = 1 - distance
+  const allCandidates: Array<SearchResultItem & { embedding: number[] }> = (
+    queryResults.ids[0] ?? []
+  ).map((id, i) => {
+    const distance = queryResults.distances?.[0]?.[i] ?? 2
+    const similarity = Math.max(0, 1 - distance / 2)
     const metadata = queryResults.metadatas[0][i] as unknown as ProductMetadata
-    return { id, similarity, metadata }
+    const emb = (queryResults.embeddings?.[0]?.[i] as number[]) ?? []
+    return { id, similarity, metadata, embedding: emb }
   })
 
-  const topSimilarity = results[0]?.similarity ?? 0
+  // Filter out non-residential products before MMR so diversity picks from clean pool
+  const candidates = allCandidates.filter((c) => isResidentialDoor(c.metadata.name))
+
+  const topSimilarity = allCandidates[0]?.similarity ?? 0
+  const results = applyMMR(candidates, n)
+
   return {
     results,
     isLowSimilarity: topSimilarity < LOW_SIMILARITY_THRESHOLD,
