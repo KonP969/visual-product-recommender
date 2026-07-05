@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Product } from '@/types'
 
 interface ProductCardProps {
@@ -20,6 +21,7 @@ function formatPrice(price: string): string {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  const [imageLoaded, setImageLoaded] = useState(false)
   const label = matchLabel(product.similarity)
   // Feed names follow "PORTA LINE model H.1 czarne intarsje - Czarny Struktura":
   // the part after " - " is the finish/colour variant (sometimes empty).
@@ -29,11 +31,24 @@ export function ProductCard({ product }: ProductCardProps) {
   const content = (
     <article className="group flex h-full flex-col gap-2.5">
       <div className="relative flex aspect-[3/4] items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-panel to-[#EAE4D9] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_20px_34px_-22px_rgba(38,34,28,0.5)] motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+        {!imageLoaded && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 flex items-end justify-center motion-reduce:animate-none"
+          >
+            {/* door-shaped shimmer while the Porta CDN packshot loads */}
+            <div className="h-[82%] w-[46%] animate-pulse rounded-t-[3px] bg-linen/70" />
+          </div>
+        )}
         <img
           src={product.imageUrl}
           alt={product.name}
           loading="lazy"
-          className="h-full w-full object-contain p-4 pb-0"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageLoaded(true)}
+          className={`h-full w-full object-contain p-4 pb-0 transition-opacity duration-300 motion-reduce:transition-none ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
         />
         <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[10px] uppercase tracking-[0.1em]">
           <span className={`h-1.5 w-1.5 rounded-full ${label.dotClass}`} />
