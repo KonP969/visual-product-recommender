@@ -54,6 +54,11 @@ export function ProductCard({ product }: ProductCardProps) {
           <span className={`h-1.5 w-1.5 rounded-full ${label.dotClass}`} />
           <span className={label.textClass}>{label.text}</span>
         </span>
+        {product.why && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/85 via-ink/60 to-transparent p-3 pt-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100 motion-reduce:transition-none">
+            <p className="m-0 text-[12.5px] leading-relaxed text-paper">{product.why}</p>
+          </div>
+        )}
       </div>
       <h2 className="m-0 line-clamp-2 text-[14px] font-semibold leading-snug text-ink">
         {title}

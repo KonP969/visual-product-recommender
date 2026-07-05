@@ -6,6 +6,8 @@ export interface Product {
   productUrl?: string
   similarity: number
   description?: string
+  /** Polskie uzasadnienie dopasowania — dociera osobnym eventem po wynikach */
+  why?: string
 }
 
 export interface SearchResult {

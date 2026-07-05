@@ -10,6 +10,12 @@ import { SearchResults } from '@/components/SearchResults'
 import { ImportPanel } from '@/components/ImportPanel'
 import { CatalogBrowser } from '@/components/CatalogBrowser'
 
+const SAMPLES = [
+  { src: '/samples/nowoczesny-salon.jpg', label: 'nowoczesny salon' },
+  { src: '/samples/jasna-sypialnia.jpg', label: 'jasne wnętrze' },
+  { src: '/samples/klasyczny-salon.jpg', label: 'klasyczny salon' },
+]
+
 export default function App() {
   const { previewUrl, validationError, handleFile } = useFileUpload()
   const { appState, searchStage, searchResult, errorMessage, search, refine } = useSearch()
@@ -19,6 +25,16 @@ export default function App() {
     if (handleFile(newFile)) {
       search(newFile)
     }
+  }
+
+  const handleSample = async (sample: (typeof SAMPLES)[number]) => {
+    const response = await fetch(sample.src)
+    const blob = await response.blob()
+    handleFileSelected(
+      new File([blob], sample.src.split('/').pop() ?? 'sample.jpg', {
+        type: blob.type || 'image/jpeg',
+      }),
+    )
   }
 
   return (
@@ -36,12 +52,36 @@ export default function App() {
                 kolorem i stylem
               </p>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-8">
               <DropZone
                 previewUrl={null}
                 validationError={validationError}
                 onFile={handleFileSelected}
               />
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-ink-soft">
+                  albo wypróbuj z przykładem
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {SAMPLES.map((sample) => (
+                    <button
+                      key={sample.src}
+                      type="button"
+                      onClick={() => handleSample(sample)}
+                      className="group flex flex-col items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass"
+                    >
+                      <img
+                        src={sample.src}
+                        alt={`Przykładowe wnętrze: ${sample.label}`}
+                        className="h-20 w-28 rounded-xl object-cover shadow-sm ring-1 ring-linen transition-all group-hover:-translate-y-0.5 group-hover:ring-brass motion-reduce:transition-none motion-reduce:group-hover:translate-y-0"
+                      />
+                      <span className="text-xs text-ink-soft group-hover:text-brass-deep">
+                        {sample.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </>
         ) : (

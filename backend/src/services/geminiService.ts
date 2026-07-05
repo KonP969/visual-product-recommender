@@ -83,10 +83,11 @@ const GEMINI_TIMEOUT_MS = 30_000
 const CACHE_MAX = 200
 const imageCache = new Map<string, DoorDescription>()
 const textCache = new Map<string, DoorDescription>()
+const reasonsCache = new Map<string, Record<string, string>>()
 
-function cacheGet(cache: Map<string, DoorDescription>, key: string): DoorDescription | undefined {
+function cacheGet<T>(cache: Map<string, T>, key: string): T | undefined {
   const hit = cache.get(key)
-  if (hit) {
+  if (hit !== undefined) {
     // Re-insert to mark as most recently used
     cache.delete(key)
     cache.set(key, hit)
@@ -94,7 +95,7 @@ function cacheGet(cache: Map<string, DoorDescription>, key: string): DoorDescrip
   return hit
 }
 
-function cacheSet(cache: Map<string, DoorDescription>, key: string, value: DoorDescription): void {
+function cacheSet<T>(cache: Map<string, T>, key: string, value: T): void {
   if (cache.size >= CACHE_MAX) {
     const oldest = cache.keys().next().value
     if (oldest !== undefined) cache.delete(oldest)
@@ -113,20 +114,38 @@ export function parseDoorDescription(raw: string): DoorDescription {
   return { clipQuery, displayPl: displayPl || clipQuery }
 }
 
-async function generateWithTimeout(
+const RETRY_DELAY_MS = 1_500
+
+async function generateJson(
   parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>,
-): Promise<DoorDescription> {
+): Promise<string> {
   const model = getClient().getGenerativeModel({
     model: MODEL_NAME,
     generationConfig: { responseMimeType: 'application/json' },
   })
 
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Gemini timeout after ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS),
-  )
+  const attempt = async (): Promise<string> => {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Gemini timeout after ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS),
+    )
+    const result = await Promise.race([model.generateContent(parts), timeoutPromise])
+    return result.response.text()
+  }
 
-  const result = await Promise.race([model.generateContent(parts), timeoutPromise])
-  return parseDoorDescription(result.response.text())
+  try {
+    return await attempt()
+  } catch (err) {
+    // 503 "high demand" spikes are transient — one retry usually suffices
+    console.warn('[GEMINI] Retrying after error:', err instanceof Error ? err.message.slice(0, 120) : err)
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+    return attempt()
+  }
+}
+
+async function generateWithTimeout(
+  parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>,
+): Promise<DoorDescription> {
+  return parseDoorDescription(await generateJson(parts))
 }
 
 // Downscale large photos before base64-encoding: Gemini doesn't need more than
@@ -178,6 +197,69 @@ export async function describeRoomForDoorMatching(
   ])
   cacheSet(imageCache, key, description)
   return description
+}
+
+export interface MatchCandidate {
+  id: string
+  name: string
+  description: string
+}
+
+export function parseMatchReasons(
+  raw: string,
+  candidates: MatchCandidate[],
+): Record<string, string> {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  const parsed = JSON.parse(cleaned) as Array<{ i?: number; why?: string }>
+  if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array reasons')
+
+  const reasons: Record<string, string> = {}
+  for (const item of parsed) {
+    const idx = typeof item.i === 'number' ? item.i - 1 : -1
+    const why = item.why?.trim()
+    if (idx >= 0 && idx < candidates.length && why) {
+      reasons[candidates[idx].id] = why
+    }
+  }
+  return reasons
+}
+
+const REASONS_PROMPT_HEAD = `You are an interior design assistant. The customer's room needs a door matching this style (internal English query):
+
+`
+
+const REASONS_PROMPT_RULES = `
+
+For each numbered product below, write ONE short Polish sentence explaining why it fits that style — point at a concrete visual link (color, finish, glass, panel style). Do not repeat the product name. Lowercase start, max 14 words.
+
+Output ONLY a JSON array: [{"i": <product number as int>, "why": "<Polish sentence>"}]
+
+Products:
+`
+
+// Explains, per product, why it matches the room — shown on card hover.
+// Runs AFTER results are sent, so it never delays the search itself.
+export async function explainMatches(
+  clipQuery: string,
+  candidates: MatchCandidate[],
+): Promise<Record<string, string>> {
+  if (candidates.length === 0) return {}
+
+  const key = clipQuery + '|' + candidates.map((c) => c.id).join(',')
+  const cached = cacheGet(reasonsCache, key)
+  if (cached) {
+    console.log('[GEMINI] Match reasons cache hit')
+    return cached
+  }
+
+  const productLines = candidates
+    .map((c, i) => `${i + 1}. ${c.name}${c.description ? ` | ${c.description}` : ''}`)
+    .join('\n')
+  const prompt = REASONS_PROMPT_HEAD + `"${clipQuery}"` + REASONS_PROMPT_RULES + productLines
+
+  const reasons = parseMatchReasons(await generateJson([{ text: prompt }]), candidates)
+  cacheSet(reasonsCache, key, reasons)
+  return reasons
 }
 
 export async function describeDoorFromText(userQuery: string): Promise<DoorDescription> {

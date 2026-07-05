@@ -1,8 +1,13 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import multer from 'multer'
 import { getEmbedding, getTextEmbedding } from '../services/clipService'
 import { searchSimilar, SearchResultItem } from '../services/chromaService'
-import { describeRoomForDoorMatching, describeDoorFromText, DoorDescription } from '../services/geminiService'
+import {
+  describeRoomForDoorMatching,
+  describeDoorFromText,
+  explainMatches,
+  DoorDescription,
+} from '../services/geminiService'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -52,20 +57,48 @@ function buildResultPayload(
   }
 }
 
-// Streams NDJSON progress events followed by the final result, so the UI can
-// show which pipeline stage (Gemini analysis vs vector matching) is running.
+function ndjson(res: Response): (event: object) => void {
+  res.setHeader('Content-Type', 'application/x-ndjson')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no')
+  return (event: object) => {
+    res.write(JSON.stringify(event) + '\n')
+  }
+}
+
+// Per-product "why it matches" arrives as a follow-up event so it never
+// delays the results themselves.
+async function sendMatchReasons(
+  send: (event: object) => void,
+  description: DoorDescription | null,
+  results: SearchResultItem[],
+): Promise<void> {
+  if (!description || results.length === 0) return
+  try {
+    const reasons = await explainMatches(
+      description.clipQuery,
+      results.map((r) => ({
+        id: r.id,
+        name: r.metadata.name,
+        description: r.metadata.description ?? '',
+      })),
+    )
+    if (Object.keys(reasons).length > 0) {
+      send({ type: 'reasons', data: reasons })
+    }
+  } catch (err) {
+    console.warn('[SEARCH] Match reasons failed:', err instanceof Error ? err.message : err)
+  }
+}
+
+// Streams NDJSON: progress stages, then the result, then per-product reasons.
 searchRouter.post('/search', upload.single('image'), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: 'No image provided' })
     return
   }
 
-  res.setHeader('Content-Type', 'application/x-ndjson')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('X-Accel-Buffering', 'no')
-  const send = (event: object) => {
-    res.write(JSON.stringify(event) + '\n')
-  }
+  const send = ndjson(res)
 
   try {
     const fileSizeKB = Math.round(req.file.buffer.length / 1024)
@@ -93,6 +126,7 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 
     send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
+    await sendMatchReasons(send, description, results)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed'
     console.error('[SEARCH] Error:', message)
@@ -101,23 +135,32 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
   res.end()
 })
 
-// Text refinement: user edits the description and re-searches without re-uploading.
-searchRouter.post('/search-text', async (req, res, next) => {
-  try {
-    const query = typeof req.body?.query === 'string' ? req.body.query.trim() : ''
-    if (!query) {
-      res.status(400).json({ error: 'No query provided' })
-      return
-    }
+// Text refinement: user edits the description and re-searches without
+// re-uploading. Same NDJSON stream shape as /search.
+searchRouter.post('/search-text', async (req, res) => {
+  const query = typeof req.body?.query === 'string' ? req.body.query.trim() : ''
+  if (!query) {
+    res.status(400).json({ error: 'No query provided' })
+    return
+  }
 
+  const send = ndjson(res)
+
+  try {
+    send({ type: 'progress', stage: 'analyzing' })
     const description = await describeDoorFromText(query)
     console.log(`[SEARCH-TEXT] "${query}" -> clip="${description.clipQuery}"`)
 
+    send({ type: 'progress', stage: 'matching' })
     const embedding = await getTextEmbedding(description.clipQuery)
     const { results, isLowSimilarity } = await searchSimilar(embedding, 10)
 
-    res.json(buildResultPayload(description, results, isLowSimilarity))
+    send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
+    await sendMatchReasons(send, description, results)
   } catch (err) {
-    next(err)
+    const message = err instanceof Error ? err.message : 'Search failed'
+    console.error('[SEARCH-TEXT] Error:', message)
+    send({ type: 'error', error: message })
   }
+  res.end()
 })

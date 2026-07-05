@@ -20,45 +20,77 @@ export function useSearch(): UseSearchReturn {
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const applyResponse = useCallback((response: ApiResponse<SearchResult>) => {
-    if (response.error) {
-      setErrorMessage(response.error)
-      setAppState('error')
-      return
-    }
-
-    const result = response.data!
-
+  const applyResult = useCallback((result: SearchResult) => {
     if (result.products.length === 0) {
       setAppState('empty-catalog')
       return
     }
-
     setSearchResult(result)
     setAppState(result.status === 'low-similarity' ? 'low-similarity' : 'success')
   }, [])
 
-  const search = useCallback(async (file: File) => {
-    setAppState('loading')
-    setSearchStage('analyzing')
-    setSearchResult(null)
-    setErrorMessage(null)
+  const applyError = useCallback((response: ApiResponse<SearchResult>) => {
+    if (response.error) {
+      setErrorMessage(response.error)
+      setAppState('error')
+    }
+  }, [])
 
-    const response = USE_MOCK
-      ? await mockSearchByImage(file)
-      : await (await import('@/lib/api')).searchByImage(file, setSearchStage)
+  // Uzasadnienia dopasowań docierają po wynikach — dopinamy je do produktów
+  const mergeReasons = useCallback((reasons: Record<string, string>) => {
+    setSearchResult((prev) =>
+      prev
+        ? {
+            ...prev,
+            products: prev.products.map((p) =>
+              reasons[p.id] ? { ...p, why: reasons[p.id] } : p,
+            ),
+          }
+        : prev,
+    )
+  }, [])
 
-    applyResponse(response)
-  }, [applyResponse])
+  const search = useCallback(
+    async (file: File) => {
+      setAppState('loading')
+      setSearchStage('analyzing')
+      setSearchResult(null)
+      setErrorMessage(null)
 
-  const refine = useCallback(async (query: string) => {
-    setAppState('loading')
-    setSearchStage('matching')
-    setErrorMessage(null)
+      if (USE_MOCK) {
+        const response = await mockSearchByImage(file)
+        if (response.error) applyError(response)
+        else applyResult(response.data!)
+        return
+      }
 
-    const response = await (await import('@/lib/api')).searchByText(query)
-    applyResponse(response)
-  }, [applyResponse])
+      const { searchByImage } = await import('@/lib/api')
+      const response = await searchByImage(file, {
+        onStage: setSearchStage,
+        onResult: applyResult,
+        onReasons: mergeReasons,
+      })
+      applyError(response)
+    },
+    [applyResult, applyError, mergeReasons],
+  )
+
+  const refine = useCallback(
+    async (query: string) => {
+      setAppState('loading')
+      setSearchStage('analyzing')
+      setErrorMessage(null)
+
+      const { searchByText } = await import('@/lib/api')
+      const response = await searchByText(query, {
+        onStage: setSearchStage,
+        onResult: applyResult,
+        onReasons: mergeReasons,
+      })
+      applyError(response)
+    },
+    [applyResult, applyError, mergeReasons],
+  )
 
   const reset = useCallback(() => {
     setAppState('idle')
