@@ -44,6 +44,8 @@ const TEXT_PROMPT = `You are helping match RESIDENTIAL INTERIOR doors to a custo
 
 The customer described (in Polish or English) the interior door they want. Convert it faithfully — keep every color, finish and style constraint they stated.
 
+The description may contain relative adjustments after "ale" (e.g. "ale jaśniejsze" = but lighter, "ale ciemniejsze" = but darker, "ale bez przeszklenia" = but without glass, "ale klasyczne" = but classic). Apply each adjustment to transform the base description: the output must describe the ADJUSTED door and drop any base attribute the adjustment contradicts (e.g. "czarne drzwi, ale jaśniejsze" → a lighter door such as grey or light oak, NOT black).
+
 Output a JSON object with exactly two keys:
 - "clip_query": an English phrase optimized for CLIP text-to-image search
 - "display_pl": a short Polish description of the same door, shown back to the customer

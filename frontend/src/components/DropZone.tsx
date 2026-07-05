@@ -43,8 +43,8 @@ export function DropZone({ previewUrl, validationError, onFile }: DropZoneProps)
         className={cn(
           'relative flex h-64 w-full max-w-lg cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all',
           isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/50',
+            ? 'border-brass bg-brass-soft'
+            : 'border-linen bg-white/60 hover:border-brass hover:bg-brass-soft/50',
         )}
       >
         {previewUrl ? (
@@ -57,16 +57,16 @@ export function DropZone({ previewUrl, validationError, onFile }: DropZoneProps)
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="rounded-full bg-white p-3 shadow-sm">
               {isDragging ? (
-                <ImageIcon className="h-6 w-6 text-blue-500" />
+                <ImageIcon className="h-6 w-6 text-brass" />
               ) : (
-                <Upload className="h-6 w-6 text-gray-400" />
+                <Upload className="h-6 w-6 text-ink-soft" />
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-ink">
                 Przeciągnij zdjęcie wnętrza tutaj
               </p>
-              <p className="mt-0.5 text-xs text-gray-400">
+              <p className="mt-0.5 text-xs text-ink-soft">
                 lub kliknij, aby wybrać · JPG, PNG, WEBP · maks. 10 MB
               </p>
             </div>

@@ -8,7 +8,8 @@ interface UseFileUploadReturn {
   file: File | null
   previewUrl: string | null
   validationError: FileValidationError | null
-  handleFile: (file: File) => void
+  /** Returns true when the file passed validation and preview was set */
+  handleFile: (file: File) => boolean
   reset: () => void
 }
 
@@ -17,7 +18,7 @@ export function useFileUpload(): UseFileUploadReturn {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<FileValidationError | null>(null)
 
-  const handleFile = useCallback((newFile: File) => {
+  const handleFile = useCallback((newFile: File): boolean => {
     setValidationError(null)
 
     if (!ACCEPTED_TYPES.includes(newFile.type)) {
@@ -25,7 +26,7 @@ export function useFileUpload(): UseFileUploadReturn {
         type: 'invalid-type',
         message: 'Wgraj plik graficzny (JPG, PNG lub WEBP).',
       })
-      return
+      return false
     }
 
     if (newFile.size > MAX_SIZE_BYTES) {
@@ -33,7 +34,7 @@ export function useFileUpload(): UseFileUploadReturn {
         type: 'too-large',
         message: 'Zdjęcie musi być mniejsze niż 10 MB.',
       })
-      return
+      return false
     }
 
     if (previewUrl) {
@@ -42,6 +43,7 @@ export function useFileUpload(): UseFileUploadReturn {
 
     setFile(newFile)
     setPreviewUrl(URL.createObjectURL(newFile))
+    return true
   }, [previewUrl])
 
   const reset = useCallback(() => {

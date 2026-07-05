@@ -7,7 +7,23 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['Georgia', '"Times New Roman"', 'serif'],
+      },
       colors: {
+        paper: "#FBF9F5",
+        panel: "#F1EDE5",
+        ink: {
+          DEFAULT: "#26221C",
+          soft: "#6E675C",
+        },
+        linen: "#E2DCD0",
+        brass: {
+          DEFAULT: "#9A742D",
+          soft: "#F0E7D4",
+          deep: "#7C5C22",
+        },
+        good: "#3E6B4F",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
