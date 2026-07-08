@@ -8,6 +8,7 @@ interface RailProps {
   validationError: FileValidationError | null
   onFile: (file: File) => void
   onRefine: (query: string) => void
+  onReset: () => void
 }
 
 const CHIPS = [
@@ -26,6 +27,7 @@ export function Rail({
   validationError,
   onFile,
   onRefine,
+  onReset,
 }: RailProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [refineQuery, setRefineQuery] = useState('')
@@ -119,6 +121,14 @@ export function Rail({
           Szukaj
         </button>
       </form>
+
+      <button
+        type="button"
+        onClick={onReset}
+        className="self-start text-xs text-ink-soft/70 underline decoration-linen underline-offset-2 transition-colors hover:text-ink-soft"
+      >
+        ← zacznij od nowa
+      </button>
     </aside>
   )
 }

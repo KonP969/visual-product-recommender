@@ -17,9 +17,14 @@ const SAMPLES = [
 ]
 
 export default function App() {
-  const { previewUrl, validationError, handleFile } = useFileUpload()
-  const { appState, searchStage, searchResult, errorMessage, search, refine } = useSearch()
+  const { previewUrl, validationError, handleFile, reset: resetFile } = useFileUpload()
+  const { appState, searchStage, searchResult, errorMessage, search, refine, reset: resetSearch } = useSearch()
   const [showAdmin, setShowAdmin] = useState(false)
+
+  const handleReset = () => {
+    resetFile()
+    resetSearch()
+  }
 
   const handleFileSelected = (newFile: File) => {
     if (handleFile(newFile)) {
@@ -93,6 +98,7 @@ export default function App() {
               validationError={validationError}
               onFile={handleFileSelected}
               onRefine={refine}
+              onReset={handleReset}
             />
             <SearchResults
               appState={appState}

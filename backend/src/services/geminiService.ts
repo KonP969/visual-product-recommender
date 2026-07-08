@@ -497,6 +497,46 @@ export async function explainMatches(
   return reasons
 }
 
+const BATCH_DESCRIBE_PROMPT = `You are processing a Polish catalog of doors. For each numbered Polish product name, output an English description optimized for CLIP image-search.
+
+INPUT FORMAT: each line is "<index>. <Polish name>"
+
+OUTPUT FORMAT: a JSON array of objects, one per input line, with keys "i" (index as int) and "d" (English description). Output ONLY the JSON.
+
+DESCRIPTION RULES:
+- FIRST determine the PRODUCT CATEGORY from the name and encode it (see CATEGORY GUIDE).
+- Start with the DOMINANT DOOR COLOR in English (white, black, dark oak, light oak, walnut, grey, anthracite, beige, champagne, frosted glass, graphite, etc.)
+- Repeat the color or a tonal synonym at least once more.
+- Include material clue (wood / wood veneer / lacquered / powder-coated steel / glass) and style cue (flat panel / raised panel / glass insert / loft / classic / modern).
+- Add room context for residential doors (bedroom, living room, hallway) and mood (cozy, minimalist, warm, elegant, rustic).
+- Target 25-35 words. CLIP-friendly: plain nouns and adjectives, no verbs.
+
+CATEGORY GUIDE:
+- Residential interior door (HOME, SYSTEM, VERTE, GLASS, CLASSIC, LOFT, VECTOR, FIT, LINE, KONCEPT, standard models) → include "residential interior door"
+- Acoustic (Akustyczne, dB) → include "acoustic sound insulation door"
+- Security (EXTREME, RC2-RC4, antywłamaniowe) → include "security reinforced entrance door"
+- Steel/technical (Steel SOLID, GRANIT) → include "steel technical entrance door"
+- Fire-rated (przeciwpożarowe, EI30/EI60) → include "fire rated technical door"
+
+Products:
+`
+
+// Batch opisów do indeksowania nowych produktów (sync katalogu) — 50 nazw
+// w jednym wywołaniu, format zgodny z reindex_text.py.
+export async function describeProductsBatch(
+  names: Array<{ i: number; name: string }>,
+): Promise<Record<number, string>> {
+  const lines = names.map((n) => `${n.i}. ${n.name}`).join('\n')
+  const raw = await generateJson([{ text: BATCH_DESCRIBE_PROMPT + lines }])
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  const parsed = JSON.parse(cleaned) as Array<{ i?: number; d?: string }>
+  const out: Record<number, string> = {}
+  for (const item of parsed) {
+    if (typeof item.i === 'number' && item.d?.trim()) out[item.i] = item.d.trim()
+  }
+  return out
+}
+
 export async function describeDoorFromText(userQuery: string): Promise<DoorDescription> {
   const key = PROMPT_VERSION + ':' + userQuery.trim().toLowerCase()
   const cached = cacheGet(textCache, key)
