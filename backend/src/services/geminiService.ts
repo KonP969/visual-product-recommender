@@ -5,10 +5,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { Jimp } from 'jimp'
 import { COLOR_FAMILIES, ColorFamily } from './attributeService'
 
-// Free tier ma limit DZIENNY per model: 2.5-flash-lite i 2.5-flash po ~20/dzień
-// (rodzina 2.0 ma limit 0 — wycofana z free tier). Próbujemy modeli po kolei,
-// więc dzienny budżet się sumuje.
+// Free tier Google ma limit DZIENNY per model: 2.5-flash-lite i 2.5-flash po
+// ~20/dzień (rodzina 2.0 ma limit 0). Próbujemy modeli po kolei, więc dzienny
+// budżet się sumuje. Z kluczem OpenRouter (OPENROUTER_API_KEY) używamy tego
+// samego modelu przez OpenRouter — płatnie (ułamki grosza), bez limitów dziennych.
 const MODEL_CHAIN = ['gemini-2.5-flash-lite', 'gemini-2.5-flash']
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite'
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 const CLIP_QUERY_RULES = `CLIP QUERY RULES (for "clip_query"):
 - The phrase MUST START with the dominant door color (e.g. "white", "black", "dark walnut", "light oak", "grey").
@@ -221,9 +224,49 @@ function isDailyQuotaError(message: string): boolean {
   return message.includes('PerDay') || (message.includes('429') && message.includes('limit: 0'))
 }
 
-async function generateJson(
-  parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>,
-): Promise<string> {
+type GeminiParts = Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>
+
+// OpenRouter mówi dialektem OpenAI — konwertujemy części Gemini na content array.
+async function openRouterAttempt(parts: GeminiParts): Promise<string> {
+  const content = parts.map((p) =>
+    'text' in p
+      ? { type: 'text' as const, text: p.text }
+      : {
+          type: 'image_url' as const,
+          image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` },
+        },
+  )
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS)
+  try {
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        messages: [{ role: 'user', content }],
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 200)}`)
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const text = data.choices?.[0]?.message?.content
+    if (!text) throw new Error('OpenRouter returned empty content')
+    return text
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function generateJson(parts: GeminiParts): Promise<string> {
   const attempt = async (modelName: string): Promise<string> => {
     const model = getClient().getGenerativeModel({
       model: modelName,
@@ -234,6 +277,23 @@ async function generateJson(
     )
     const result = await Promise.race([model.generateContent(parts), timeoutPromise])
     return result.response.text()
+  }
+
+  // Preferowana ścieżka: OpenRouter (płatny, bez limitów dziennych free tier).
+  if (process.env.OPENROUTER_API_KEY) {
+    let lastError: unknown
+    for (let i = 1; i <= 3; i++) {
+      try {
+        return await openRouterAttempt(parts)
+      } catch (err) {
+        lastError = err
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn(`[GEMINI/OR] attempt ${i} failed:`, message.slice(0, 120))
+        if (i < 3) await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * i))
+      }
+    }
+    // OpenRouter padł całkiem — spróbuj jeszcze bezpośredniego Google API niżej.
+    console.warn('[GEMINI/OR] OpenRouter niedostępny, próbuję Google API:', lastError instanceof Error ? lastError.message.slice(0, 80) : lastError)
   }
 
   // Dzienny limit per model → przy jego wyczerpaniu przechodzimy do kolejnego
