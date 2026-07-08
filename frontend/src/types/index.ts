@@ -10,10 +10,18 @@ export interface Product {
   why?: string
 }
 
+export interface Wildcard {
+  displayDescription: string
+  why: string
+  products: Product[]
+}
+
 export interface SearchResult {
   products: Product[]
   description?: string
   displayDescription?: string
+  /** Odważna alternatywa projektanta (tylko wyszukiwanie ze zdjęcia) */
+  wildcard?: Wildcard | null
   status: 'success' | 'empty-catalog' | 'low-similarity'
 }
 

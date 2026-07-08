@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { ChromaClient, Collection } from 'chromadb'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
@@ -154,10 +155,30 @@ async function queryCandidates(
   })
 }
 
+// Deterministyczny jitter rankingu: kandydaci o niemal identycznym similarity
+// (np. 0.95 vs 0.953) są praktycznie równoważni, a bez tego dwa podobne
+// wnętrza dostają identyczne top-N. Seed (hash zdjęcia / tekst zapytania)
+// tasuje remisy inaczej dla każdego zapytania — powtarzalnie.
+const JITTER_RANGE = 0.012
+
+export function applySeededJitter<T extends { id: string; similarity: number }>(
+  candidates: T[],
+  seed: string,
+): T[] {
+  return candidates
+    .map((c) => {
+      const h = createHash('sha256').update(`${seed}:${c.id}`).digest()
+      const unit = h.readUInt32BE(0) / 0xffffffff // [0,1]
+      return { ...c, similarity: c.similarity + (unit - 0.5) * JITTER_RANGE }
+    })
+    .sort((a, b) => b.similarity - a.similarity)
+}
+
 export async function searchSimilar(
   embedding: number[],
   n: number = 5,
   filters?: HardFilters,
+  seed?: string,
   candidateMultiplier = 5,
 ): Promise<{ results: SearchResultItem[]; isLowSimilarity: boolean }> {
   const col = await getCollection()
@@ -180,8 +201,11 @@ export async function searchSimilar(
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
   }
 
+  // isLowSimilarity liczymy PRZED jitterem — z prawdziwego similarity
   const topSimilarity = candidates[0]?.similarity ?? 0
-  const results = applyMMR(candidates, n)
+
+  const ranked = seed ? applySeededJitter(candidates, seed) : candidates
+  const results = applyMMR(ranked, n)
 
   return {
     results,

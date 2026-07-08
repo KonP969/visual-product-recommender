@@ -52,16 +52,22 @@ Worked example: base "ciemnozielone, matowe drzwi" + "ale jaśniejsze":
 - colors: ["grey","medium_wood","light_wood","beige","white"] (no dark_wood, no black)
 - clip_query and display_pl MUST describe the ADJUSTED, lighter door (e.g. "light olive green matte..." / "jasnozielone, oliwkowe, matowe drzwi..."), never the original dark color.`
 
-const IMAGE_PROMPT = `You are helping match RESIDENTIAL INTERIOR doors to a room's style.
+const IMAGE_PROMPT = `You are an INTERIOR DESIGNER choosing a RESIDENTIAL INTERIOR door for this room.
 
-Look at this interior photo and describe the residential interior door that would best fit this room.
+DESIGNER METHOD (follow in this order):
+1. Read the PERMANENT surfaces first: wall color, floor material and tone, existing trim/skirting/window frames. Doors live with walls and floors for decades — furniture gets replaced, so furniture color is only a secondary accent hint, never the primary driver.
+2. Default pairing logic: door harmonises with walls+trim (blends in, most common) OR picks up the floor's wood tone (warm, coherent). Choose whichever fits this room better.
+3. Read the room's STYLE precisely and name it with 2-3 SPECIFIC adjectives unique to this photo (e.g. "Scandinavian airy", "classic elegant warm", "loft industrial", "japandi muted"). Do NOT default to "modern minimalist" — differentiate.
+4. Separately, imagine ONE bold "wild card" door a confident designer would suggest: a contrasting or unexpected choice that still works in this room (e.g. black accent door in an all-white room, warm walnut in a grey room). It must differ in color family from the safe pick.
 
-Output a JSON object with exactly three keys:
-- "clip_query": an English phrase optimized for CLIP text-to-image search
-- "display_pl": a short Polish description of the same door, shown to the customer
-- "filters": {"colors": [...], "glass": null} — color families matching your recommendation (1-3 values, the recommended family plus at most adjacent tones); glass is null for photos (don't constrain glazing from a room photo)
+Output a JSON object with exactly four keys:
+- "clip_query": English phrase for CLIP search describing the SAFE recommendation (walls/floor-driven)
+- "display_pl": short Polish description of the safe recommendation
+- "filters": {"colors": [...], "glass": null} — 1-2 color families for the safe pick
+- "wild": {"clip_query": ..., "display_pl": ..., "why_pl": ..., "filters": {"colors": [...], "glass": null}} — the bold alternative; "why_pl" is ONE Polish sentence (max 18 words) explaining the designer's reasoning, referencing concrete features of THIS room
 
 ${CLIP_QUERY_RULES}
+- The clip_query MUST include the 2-3 style adjectives from step 3 — two different bright rooms must produce DIFFERENT queries.
 
 ${DISPLAY_PL_RULES}
 
@@ -96,10 +102,19 @@ export interface SearchFilters {
   glass: boolean | null
 }
 
+export interface WildCard {
+  clipQuery: string
+  displayPl: string
+  whyPl: string
+  filters: SearchFilters
+}
+
 export interface DoorDescription {
   clipQuery: string
   displayPl: string
   filters: SearchFilters
+  /** Odważna alternatywa projektanta — tylko dla wyszukiwania ze zdjęcia */
+  wild?: WildCard
 }
 
 let client: GoogleGenerativeAI | null = null
@@ -204,13 +219,29 @@ function parseFilters(raw: unknown): SearchFilters {
   return { colors, glass }
 }
 
+interface RawDescription {
+  clip_query?: string
+  display_pl?: string
+  filters?: unknown
+  wild?: RawDescription & { why_pl?: string }
+}
+
+function parseWild(raw: RawDescription['wild']): WildCard | undefined {
+  if (!raw) return undefined
+  const clipQuery = raw.clip_query?.trim()
+  const whyPl = raw.why_pl?.trim()
+  if (!clipQuery || !whyPl) return undefined
+  return {
+    clipQuery,
+    displayPl: raw.display_pl?.trim() || clipQuery,
+    whyPl,
+    filters: parseFilters(raw.filters),
+  }
+}
+
 export function parseDoorDescription(raw: string): DoorDescription {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
-  const parsed = JSON.parse(cleaned) as {
-    clip_query?: string
-    display_pl?: string
-    filters?: unknown
-  }
+  const parsed = JSON.parse(cleaned) as RawDescription
   const clipQuery = parsed.clip_query?.trim()
   const displayPl = parsed.display_pl?.trim()
   if (!clipQuery) {
@@ -220,6 +251,7 @@ export function parseDoorDescription(raw: string): DoorDescription {
     clipQuery,
     displayPl: displayPl || clipQuery,
     filters: parseFilters(parsed.filters),
+    wild: parseWild(parsed.wild),
   }
 }
 
@@ -256,6 +288,8 @@ async function openRouterAttempt(parts: GeminiParts): Promise<string> {
         model: OPENROUTER_MODEL,
         messages: [{ role: 'user', content }],
         response_format: { type: 'json_object' },
+        // bez tego odpowiedź bywa ucinana w połowie stringa → nieparsowalny JSON
+        max_tokens: 2000,
       }),
     })
     if (!res.ok) {
@@ -284,12 +318,20 @@ async function generateJson(parts: GeminiParts): Promise<string> {
     return result.response.text()
   }
 
+  // Ucięta/niedomknięta odpowiedź to też błąd — ma podlegać retry, nie wysypywać
+  // wyszukiwania. Walidujemy parsowalność JSON-u jeszcze w pętli prób.
+  const assertParsableJson = (text: string): string => {
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+    JSON.parse(cleaned)
+    return text
+  }
+
   // Preferowana ścieżka: OpenRouter (płatny, bez limitów dziennych free tier).
   if (process.env.OPENROUTER_API_KEY) {
     let lastError: unknown
     for (let i = 1; i <= 3; i++) {
       try {
-        return await openRouterAttempt(parts)
+        return assertParsableJson(await openRouterAttempt(parts))
       } catch (err) {
         lastError = err
         const message = err instanceof Error ? err.message : String(err)
@@ -309,7 +351,7 @@ async function generateJson(parts: GeminiParts): Promise<string> {
   for (const modelName of MODEL_CHAIN) {
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
       try {
-        return await attempt(modelName)
+        return assertParsableJson(await attempt(modelName))
       } catch (err) {
         lastError = err
         const message = err instanceof Error ? err.message : String(err)
@@ -363,11 +405,15 @@ async function prepareImage(
   }
 }
 
+// Zmiana promptu unieważnia cache — inaczej stare odpowiedzi (bez nowych pól,
+// ze starą strategią) przeżywałyby na dysku dowolnie długo.
+const PROMPT_VERSION = 'v3-designer-wild'
+
 export async function describeRoomForDoorMatching(
   imageBuffer: Buffer,
   mimetype: string,
 ): Promise<DoorDescription> {
-  const key = createHash('sha256').update(imageBuffer).digest('hex')
+  const key = PROMPT_VERSION + ':' + createHash('sha256').update(imageBuffer).digest('hex')
   const cached = cacheGet(imageCache, key)
   if (cached) {
     console.log('[GEMINI] Image description cache hit')
@@ -452,7 +498,7 @@ export async function explainMatches(
 }
 
 export async function describeDoorFromText(userQuery: string): Promise<DoorDescription> {
-  const key = userQuery.trim().toLowerCase()
+  const key = PROMPT_VERSION + ':' + userQuery.trim().toLowerCase()
   const cached = cacheGet(textCache, key)
   if (cached) {
     console.log('[GEMINI] Text description cache hit')

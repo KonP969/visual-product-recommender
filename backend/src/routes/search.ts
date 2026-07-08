@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { Router, Response } from 'express'
 import multer from 'multer'
 import { getEmbedding, getTextEmbedding } from '../services/clipService'
@@ -127,10 +128,37 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     if (description) {
       console.log(`[SEARCH] Filters: ${JSON.stringify(description.filters)}`)
     }
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description?.filters)
+    // Seed z hasha zdjęcia: dwa podobne wnętrza tasują remisy inaczej,
+    // a to samo zdjęcie zawsze dostaje te same wyniki.
+    const seed = createHash('sha256').update(req.file.buffer).digest('hex')
+    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description?.filters, seed)
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 
-    send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
+    const payload = buildResultPayload(description, results, isLowSimilarity)
+
+    // Odważna alternatywa projektanta: przychodzi w TYM SAMYM wywołaniu Gemini,
+    // więc kosztuje tylko jeden embedding (sidecar) i jedno query do Chroma.
+    let wildcard: object | null = null
+    if (description?.wild && results.length > 0) {
+      try {
+        const wildEmbedding = await getTextEmbedding(description.wild.clipQuery)
+        const seen = new Set(results.map((r) => r.id))
+        const { results: wildResults } = await searchSimilar(wildEmbedding, 8, description.wild.filters, seed)
+        const unique = wildResults.filter((r) => !seen.has(r.id)).slice(0, 4)
+        if (unique.length > 0) {
+          wildcard = {
+            displayDescription: description.wild.displayPl,
+            why: description.wild.whyPl,
+            products: toProducts(unique),
+          }
+          console.log(`[SEARCH] Wildcard: "${description.wild.displayPl}" (${unique.length} szt.)`)
+        }
+      } catch (err) {
+        console.warn('[SEARCH] Wildcard failed:', err instanceof Error ? err.message : err)
+      }
+    }
+
+    send({ type: 'result', data: { ...payload, wildcard } })
     await sendMatchReasons(send, description, results)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed'
@@ -159,7 +187,8 @@ searchRouter.post('/search-text', async (req, res) => {
     send({ type: 'progress', stage: 'matching' })
     const embedding = await getTextEmbedding(description.clipQuery)
     console.log(`[SEARCH-TEXT] Filters: ${JSON.stringify(description.filters)}`)
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description.filters)
+    const seed = createHash('sha256').update(query).digest('hex')
+    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description.filters, seed)
 
     send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
     await sendMatchReasons(send, description, results)

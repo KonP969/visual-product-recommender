@@ -1,6 +1,7 @@
-import { Loader2, AlertCircle, PackageSearch, SearchX, Sparkles, ScanSearch } from 'lucide-react'
+import { Loader2, AlertCircle, PackageSearch, SearchX, Sparkles, ScanSearch, Lightbulb } from 'lucide-react'
 import { AppState, SearchResult, SearchStage } from '@/types'
 import { ResultsGrid } from './ResultsGrid'
+import { ProductCard } from './ProductCard'
 
 interface SearchResultsProps {
   appState: AppState
@@ -99,6 +100,28 @@ export function SearchResults({
         </div>
       )}
       <ResultsGrid products={searchResult.products} />
+
+      {searchResult.wildcard && searchResult.wildcard.products.length > 0 && (
+        <div className="mt-12 rounded-2xl border border-brass/25 bg-brass-soft/40 p-6">
+          <div className="mb-1.5 flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-brass-deep" />
+            <h2 className="m-0 font-display text-[21px] font-normal text-ink">
+              A gdyby tak zaszaleć?
+            </h2>
+          </div>
+          <p className="mb-1 text-[15px] text-ink">
+            <span className="font-medium">{searchResult.wildcard.displayDescription}</span>
+          </p>
+          <p className="mb-5 max-w-2xl text-sm italic text-ink-soft">
+            {searchResult.wildcard.why}
+          </p>
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
+            {searchResult.wildcard.products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

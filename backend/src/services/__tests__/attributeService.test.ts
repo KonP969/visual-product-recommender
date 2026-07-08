@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { classifyDoor } from '../attributeService'
-import { buildWhere } from '../chromaService'
+import { buildWhere, applySeededJitter } from '../chromaService'
 import { parseDoorDescription } from '../geminiService'
 
 describe('classifyDoor — color from variant', () => {
@@ -69,6 +69,33 @@ describe('buildWhere', () => {
   it('glass=false is a real condition (not dropped as falsy)', () => {
     const where = buildWhere({ glass: false }) as { $and: unknown[] }
     expect(where.$and).toContainEqual({ has_glass: false })
+  })
+})
+
+describe('applySeededJitter', () => {
+  const candidates = Array.from({ length: 12 }, (_, i) => ({
+    id: `p${i}`,
+    similarity: 0.95 - i * 0.001, // niemal-remisy
+  }))
+
+  it('is deterministic for the same seed', () => {
+    const a = applySeededJitter(candidates, 'seed-1').map((c) => c.id)
+    const b = applySeededJitter(candidates, 'seed-1').map((c) => c.id)
+    expect(a).toEqual(b)
+  })
+
+  it('orders near-ties differently for different seeds', () => {
+    const a = applySeededJitter(candidates, 'seed-1').map((c) => c.id)
+    const b = applySeededJitter(candidates, 'seed-2').map((c) => c.id)
+    expect(a).not.toEqual(b)
+  })
+
+  it('does not overturn clear similarity differences', () => {
+    const spread = [
+      { id: 'best', similarity: 0.95 },
+      { id: 'far', similarity: 0.7 },
+    ]
+    expect(applySeededJitter(spread, 'any-seed')[0].id).toBe('best')
   })
 })
 
