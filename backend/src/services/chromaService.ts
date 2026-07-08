@@ -23,6 +23,14 @@ export interface ProductMetadata {
   description?: string
   category?: 'residential' | 'specialty'
   currency?: string
+  color_family?: string
+  has_glass?: boolean
+  lightness?: number
+}
+
+export interface HardFilters {
+  colors?: string[] | null
+  glass?: boolean | null
 }
 
 export interface SearchResultItem {
@@ -111,16 +119,29 @@ interface CandidateItem extends SearchResultItem {
   embedding: number[]
 }
 
+// Buduje natywny filtr Chroma: kategoria + twarde ograniczenia koloru/szkła.
+// Similarity nie umie negacji ani gwarancji koloru — to robi `where`.
+export function buildWhere(filters?: HardFilters): Record<string, unknown> {
+  const conditions: Record<string, unknown>[] = [{ category: 'residential' }]
+  if (filters?.colors && filters.colors.length > 0) {
+    conditions.push({ color_family: { $in: filters.colors } })
+  }
+  if (filters?.glass === true || filters?.glass === false) {
+    conditions.push({ has_glass: filters.glass })
+  }
+  return conditions.length === 1 ? conditions[0] : { $and: conditions }
+}
+
 async function queryCandidates(
   embedding: number[],
   candidateN: number,
-  where?: Record<string, string>,
+  where?: Record<string, unknown>,
 ): Promise<CandidateItem[]> {
   const col = await getCollection()
   const queryResults = await col.query({
     queryEmbeddings: [embedding],
     nResults: candidateN,
-    where,
+    where: where as any,
     include: ['embeddings', 'metadatas', 'distances'] as any,
   })
 
@@ -136,6 +157,7 @@ async function queryCandidates(
 export async function searchSimilar(
   embedding: number[],
   n: number = 5,
+  filters?: HardFilters,
   candidateMultiplier = 5,
 ): Promise<{ results: SearchResultItem[]; isLowSimilarity: boolean }> {
   const col = await getCollection()
@@ -148,11 +170,12 @@ export async function searchSimilar(
   // Fetch a larger candidate pool so MMR has room to diversify
   const candidateN = Math.min(n * candidateMultiplier, count)
 
-  // Native metadata filter keeps the pool clean at the DB level. Products
-  // imported before the category backfill lack the field and would be excluded
-  // by `where`, so an empty result falls back to a name-pattern post-filter.
-  let candidates = await queryCandidates(embedding, candidateN, { category: 'residential' })
-  if (candidates.length === 0) {
+  // Twarde filtry są nienegocjowalne: gdy dają mniej wyników, zwracamy mniej —
+  // nigdy nie dopełniamy produktami łamiącymi ograniczenia użytkownika.
+  let candidates = await queryCandidates(embedding, candidateN, buildWhere(filters))
+
+  // Awaryjnie (dane sprzed backfillu kategorii): tylko gdy nie było filtrów.
+  if (candidates.length === 0 && !filters?.colors && filters?.glass == null) {
     const all = await queryCandidates(embedding, candidateN)
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
   }

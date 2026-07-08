@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { parseDoorDescription } from '../geminiService'
 
+const NO_FILTERS = { colors: null, glass: null }
+
 describe('parseDoorDescription', () => {
   it('parses a plain JSON response', () => {
     const raw = '{"clip_query": "white matte residential door", "display_pl": "białe, matowe drzwi"}'
     expect(parseDoorDescription(raw)).toEqual({
       clipQuery: 'white matte residential door',
       displayPl: 'białe, matowe drzwi',
+      filters: NO_FILTERS,
     })
   })
 
@@ -15,6 +18,7 @@ describe('parseDoorDescription', () => {
     expect(parseDoorDescription(raw)).toEqual({
       clipQuery: 'black door',
       displayPl: 'czarne drzwi',
+      filters: NO_FILTERS,
     })
   })
 
@@ -23,6 +27,7 @@ describe('parseDoorDescription', () => {
     expect(parseDoorDescription(raw)).toEqual({
       clipQuery: 'oak residential door',
       displayPl: 'oak residential door',
+      filters: NO_FILTERS,
     })
   })
 
@@ -39,6 +44,7 @@ describe('parseDoorDescription', () => {
     expect(parseDoorDescription(raw)).toEqual({
       clipQuery: 'grey door',
       displayPl: 'szare drzwi',
+      filters: NO_FILTERS,
     })
   })
 })

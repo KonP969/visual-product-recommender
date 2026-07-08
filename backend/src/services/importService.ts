@@ -2,6 +2,7 @@ import { parseFeedStreaming } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct, productExists, categorizeDoor } from './chromaService'
+import { classifyDoor } from './attributeService'
 
 export interface ImportProgress {
   current: number
@@ -54,6 +55,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
       } else {
         const { buffer, mimetype } = await downloadImage(product.imageUrl)
         const embedding = await getEmbedding(buffer, mimetype)
+        const attrs = classifyDoor(product.name)
         await upsertProduct(product.id, embedding, {
           name: product.name,
           price: product.price,
@@ -61,6 +63,9 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
           productUrl: product.productUrl,
           category: categorizeDoor(product.name),
           currency: 'PLN',
+          color_family: attrs.colorFamily,
+          has_glass: attrs.hasGlass,
+          lightness: attrs.lightness,
         })
         success++
         console.log(`[IMPORT] ${label} ✓ ${product.name}`)

@@ -33,6 +33,8 @@ function toProducts(results: SearchResultItem[]) {
     productUrl: r.metadata.productUrl,
     similarity: r.similarity,
     description: r.metadata.description,
+    colorFamily: r.metadata.color_family,
+    hasGlass: r.metadata.has_glass,
   }))
 }
 
@@ -122,7 +124,10 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     const embedding = description
       ? await getTextEmbedding(description.clipQuery)
       : await getEmbedding(req.file.buffer, req.file.mimetype)
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10)
+    if (description) {
+      console.log(`[SEARCH] Filters: ${JSON.stringify(description.filters)}`)
+    }
+    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description?.filters)
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 
     send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
@@ -153,7 +158,8 @@ searchRouter.post('/search-text', async (req, res) => {
 
     send({ type: 'progress', stage: 'matching' })
     const embedding = await getTextEmbedding(description.clipQuery)
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10)
+    console.log(`[SEARCH-TEXT] Filters: ${JSON.stringify(description.filters)}`)
+    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description.filters)
 
     send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
     await sendMatchReasons(send, description, results)
