@@ -45,7 +45,12 @@ Semantics:
 - An explicit color ("czarne", "black") → colors contains ONLY that family (plus a directly adjacent tone ONLY if the customer is vague).
 - "pełne", "bez przeszklenia", "bez szyby", "solid" → glass: false
 - "ze szkłem", "przeszklone", "z szybą", "witryna" → glass: true
-- Relative adjustments: "jaśniejsze" → colors = families strictly LIGHTER than the base description's family; "ciemniejsze" → strictly darker.`
+- glass MUST stay null unless the customer explicitly mentions glazing (a "flat panel" or style word is NOT a glazing constraint).
+- Relative adjustments: "jaśniejsze" → colors = families strictly LIGHTER than the base description's family (NEVER include the base family or anything darker); "ciemniejsze" → strictly darker.
+
+Worked example: base "ciemnozielone, matowe drzwi" + "ale jaśniejsze":
+- colors: ["grey","medium_wood","light_wood","beige","white"] (no dark_wood, no black)
+- clip_query and display_pl MUST describe the ADJUSTED, lighter door (e.g. "light olive green matte..." / "jasnozielone, oliwkowe, matowe drzwi..."), never the original dark color.`
 
 const IMAGE_PROMPT = `You are helping match RESIDENTIAL INTERIOR doors to a room's style.
 
