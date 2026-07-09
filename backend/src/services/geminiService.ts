@@ -264,7 +264,7 @@ function isDailyQuotaError(message: string): boolean {
 type GeminiParts = Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>
 
 // OpenRouter mówi dialektem OpenAI — konwertujemy części Gemini na content array.
-async function openRouterAttempt(parts: GeminiParts): Promise<string> {
+async function openRouterAttempt(parts: GeminiParts, maxTokens: number): Promise<string> {
   const content = parts.map((p) =>
     'text' in p
       ? { type: 'text' as const, text: p.text }
@@ -288,8 +288,9 @@ async function openRouterAttempt(parts: GeminiParts): Promise<string> {
         model: OPENROUTER_MODEL,
         messages: [{ role: 'user', content }],
         response_format: { type: 'json_object' },
-        // bez tego odpowiedź bywa ucinana w połowie stringa → nieparsowalny JSON
-        max_tokens: 2000,
+        // bez tego odpowiedź bywa ucinana w połowie stringa → nieparsowalny JSON.
+        // Batch 50 opisów potrzebuje wyraźnie więcej niż pojedyncze wyszukiwanie.
+        max_tokens: maxTokens,
       }),
     })
     if (!res.ok) {
@@ -305,11 +306,11 @@ async function openRouterAttempt(parts: GeminiParts): Promise<string> {
   }
 }
 
-async function generateJson(parts: GeminiParts): Promise<string> {
+async function generateJson(parts: GeminiParts, maxTokens = 2000): Promise<string> {
   const attempt = async (modelName: string): Promise<string> => {
     const model = getClient().getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: 'application/json' },
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: maxTokens },
     })
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`Gemini timeout after ${GEMINI_TIMEOUT_MS / 1000}s`)), GEMINI_TIMEOUT_MS),
@@ -331,7 +332,7 @@ async function generateJson(parts: GeminiParts): Promise<string> {
     let lastError: unknown
     for (let i = 1; i <= 3; i++) {
       try {
-        return assertParsableJson(await openRouterAttempt(parts))
+        return assertParsableJson(await openRouterAttempt(parts, maxTokens))
       } catch (err) {
         lastError = err
         const message = err instanceof Error ? err.message : String(err)
@@ -527,7 +528,9 @@ export async function describeProductsBatch(
   names: Array<{ i: number; name: string }>,
 ): Promise<Record<number, string>> {
   const lines = names.map((n) => `${n.i}. ${n.name}`).join('\n')
-  const raw = await generateJson([{ text: BATCH_DESCRIBE_PROMPT + lines }])
+  // 50 opisów × 25-35 słów ≈ 2500-3500 tokenów wyjścia — potrzebny duży limit,
+  // inaczej JSON jest ucinany i cały batch przepada.
+  const raw = await generateJson([{ text: BATCH_DESCRIBE_PROMPT + lines }], 8000)
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
   const parsed = JSON.parse(cleaned) as Array<{ i?: number; d?: string }>
   const out: Record<number, string> = {}
