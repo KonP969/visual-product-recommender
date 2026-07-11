@@ -77,6 +77,37 @@ function classifyDescription(description: string): ColorFamily | null {
   return null
 }
 
+// Jawne polskie/angielskie nazwy kolorów → rodzina. Kolejność: dłuższe/bardziej
+// szczegółowe frazy przed ogólnymi, żeby "ciemny orzech" wygrało z "orzech".
+const EXPLICIT_COLOR_TERMS: Array<[RegExp, ColorFamily]> = [
+  [/\bczar\w*|\bblack\b|\bheban\w*/i, 'black'],
+  [/\bbiał\w*|\bbial\w*|\bwhite\b/i, 'white'],
+  [/\bszar\w*|\bgrey\b|\bgray\b|\bantracyt\w*|\bgrafit\w*|\bpopiel\w*/i, 'grey'],
+  [/\bbeż\w*|\bbez\w*\bkolor|\bkaszmir\w*|\bkrem\w*|\bcappuccino|\bbeige\b/i, 'beige'],
+  [/ciemn\w*\s+(orzech|dąb|dab|drewn|brąz|braz)\w*|\bwenge\b|\bciemnobr[aą]z\w*/i, 'dark_wood'],
+  [/jasn\w*\s+(orzech|dąb|dab|drewn|brąz|braz)\w*|\bjasnobr[aą]z\w*/i, 'light_wood'],
+]
+
+// Słowa oznaczające korektę względną lub zakres — wtedy NIE narzucamy koloru,
+// bo intencją nie jest konkretna rodzina ("czarne, ale jaśniejsze" = NIE czarne).
+const RELATIVE_OR_VAGUE_RE =
+  /jaśniej\w*|jasniej\w*|ciemniej\w*|lighter|darker|jasne\b|ciemne\b|light\b|dark\b|drewniane\b|wooden\b/i
+
+/**
+ * Twardy, deterministyczny kolor z tekstu zapytania — gdy użytkownik jawnie
+ * nazwał JEDEN kolor i nie użył modyfikatora względnego/zakresowego.
+ * Zwraca null, gdy nie da się jednoznacznie ustalić (wtedy ufamy LLM-owi).
+ */
+export function explicitColorFromQuery(query: string): ColorFamily[] | null {
+  if (RELATIVE_OR_VAGUE_RE.test(query)) return null
+  const found = new Set<ColorFamily>()
+  for (const [re, family] of EXPLICIT_COLOR_TERMS) {
+    if (re.test(query)) found.add(family)
+  }
+  // Tylko jednoznaczne, pojedyncze wskazanie koloru — wielokolorowe/zerowe → LLM
+  return found.size === 1 ? [...found] : null
+}
+
 export function classifyDoor(name: string, description: string = ''): DoorAttributes {
   const hasGlass = GLASS_RE.test(name) || GLASS_RE.test(description)
 

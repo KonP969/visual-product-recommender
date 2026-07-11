@@ -42,7 +42,8 @@ const FILTERS_RULES = `FILTER RULES (for "filters" — these become HARD databas
 - "glass": true (door MUST have glazing), false (door MUST be solid, NO glass at all), or null (no constraint).
 
 Semantics:
-- An explicit color ("czarne", "black") → colors contains ONLY that family (plus a directly adjacent tone ONLY if the customer is vague).
+- An explicit single color word ("czarne"/"black", "białe"/"white", "szare"/"grey") → colors contains EXACTLY that ONE family, nothing else. "czarne" is black ONLY — never dark_wood. "białe" is white ONLY — never beige. Do NOT add adjacent tones for a clear color.
+- Add a second family ONLY when the customer is genuinely vague or uses a range ("ciemne"/"dark" → ["black","dark_wood"]; "jasne"/"light" → ["white","beige","light_wood"]; "drewniane"/"wooden" → ["light_wood","medium_wood","dark_wood"]).
 - "pełne", "bez przeszklenia", "bez szyby", "solid" → glass: false
 - "ze szkłem", "przeszklone", "z szybą", "witryna" → glass: true
 - glass MUST stay null unless the customer explicitly mentions glazing (a "flat panel" or style word is NOT a glazing constraint).
@@ -408,7 +409,7 @@ async function prepareImage(
 
 // Zmiana promptu unieważnia cache — inaczej stare odpowiedzi (bez nowych pól,
 // ze starą strategią) przeżywałyby na dysku dowolnie długo.
-const PROMPT_VERSION = 'v3-designer-wild'
+const PROMPT_VERSION = 'v4-strict-color'
 
 export async function describeRoomForDoorMatching(
   imageBuffer: Buffer,

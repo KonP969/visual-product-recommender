@@ -9,6 +9,7 @@ import {
   explainMatches,
   DoorDescription,
 } from '../services/geminiService'
+import { explicitColorFromQuery } from '../services/attributeService'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -183,6 +184,14 @@ searchRouter.post('/search-text', async (req, res) => {
     send({ type: 'progress', stage: 'analyzing' })
     const description = await describeDoorFromText(query)
     console.log(`[SEARCH-TEXT] "${query}" -> clip="${description.clipQuery}"`)
+
+    // Deterministyczny guard: jawnie nazwany pojedynczy kolor przebija LLM,
+    // który bywa zbyt liberalny (np. "czarne" → dorzuca dark_wood).
+    const explicitColors = explicitColorFromQuery(query)
+    if (explicitColors) {
+      description.filters = { ...description.filters, colors: explicitColors }
+      console.log(`[SEARCH-TEXT] Guard: wymuszono kolor ${JSON.stringify(explicitColors)}`)
+    }
 
     send({ type: 'progress', stage: 'matching' })
     const embedding = await getTextEmbedding(description.clipQuery)

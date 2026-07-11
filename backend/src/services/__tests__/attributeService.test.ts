@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyDoor } from '../attributeService'
+import { classifyDoor, explicitColorFromQuery } from '../attributeService'
 import { buildWhere, applySeededJitter } from '../chromaService'
 import { parseDoorDescription } from '../geminiService'
 
@@ -69,6 +69,28 @@ describe('buildWhere', () => {
   it('glass=false is a real condition (not dropped as falsy)', () => {
     const where = buildWhere({ glass: false }) as { $and: unknown[] }
     expect(where.$and).toContainEqual({ has_glass: false })
+  })
+})
+
+describe('explicitColorFromQuery', () => {
+  it.each([
+    ['drzwi czarne', ['black']],
+    ['czarne drzwi', ['black']],
+    ['białe drzwi ze szkłem', ['white']],
+    ['szare nowoczesne drzwi', ['grey']],
+    ['drzwi w kolorze ciemnego orzecha', ['dark_wood']],
+  ])('%s → %j', (query, expected) => {
+    expect(explicitColorFromQuery(query)).toEqual(expected)
+  })
+
+  it.each([
+    'czarne, ale jaśniejsze', // korekta względna → LLM decyduje
+    'ciemne drzwi', // zakres, nie konkretny kolor
+    'jasne drewniane drzwi', // zakres
+    'nowoczesne drzwi', // brak koloru
+    'czarne albo białe', // dwa kolory → niejednoznaczne
+  ])('%s → null (zostawione LLM-owi)', (query) => {
+    expect(explicitColorFromQuery(query)).toBeNull()
   })
 })
 

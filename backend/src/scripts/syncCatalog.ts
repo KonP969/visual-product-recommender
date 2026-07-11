@@ -5,6 +5,7 @@
 //      (batch 50) → sidecar /embed-text → upsert z atrybutami
 // Odporny na przerwanie: krok 3 jest naturalnie wznawialny (nowe = feed - baza).
 // Uruchomienie: cd backend && npx ts-node --transpile-only src/scripts/syncCatalog.ts
+import 'dotenv/config'
 import { ChromaClient } from 'chromadb'
 import { parseFeedStreaming, FeedProduct } from '../services/feedParser'
 import { describeProductsBatch } from '../services/geminiService'
