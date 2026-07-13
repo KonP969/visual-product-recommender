@@ -31,7 +31,9 @@ export const LIGHTNESS: Record<ColorFamily, number> = {
   black: 1,
 }
 
-const GLASS_RE = /szyb|bulaj|przeszkl|witryn|glass|szpros|frosted|glazed/i
+export const GLASS_RE = /szyb|bulaj|przeszkl|witryn|glass|szpros|frosted|glazed/i
+// Nazwa jawnie deklarująca brak szkła — wtedy ufamy nazwie, nie wizji.
+export const SOLID_NAME_RE = /pe[łl]ne/i
 
 // Kolejność ma znaczenie: pierwsza pasująca reguła wygrywa.
 // Wariant polski (część nazwy po " - ") np. "Dąb Matowy Ciemny", "Czarny Struktura".
@@ -106,6 +108,45 @@ export function explicitColorFromQuery(query: string): ColorFamily[] | null {
   }
   // Tylko jednoznaczne, pojedyncze wskazanie koloru — wielokolorowe/zerowe → LLM
   return found.size === 1 ? [...found] : null
+}
+
+// Rzeczowniki oznaczające DETAL drzwi — kolor stojący przy nich opisuje ten
+// detal, nie skrzydło ("czarne szkło" na szarych drzwiach jest poprawne).
+const DETAIL_NOUN_RE = /szk[łl]|szyb|intarsj|wstawk|okuc|klamk|uchwyt|zawias|listw|ram[ake]/i
+
+// Konkretne nazwy kolorów/wybarwień. Modyfikatory względne ("jasny"/"ciemny")
+// świadomie POMINIĘTE — są relatywne, a ich blokowanie kasowałoby sensowne zdania.
+const COLOR_WORD_STEMS: RegExp[] = [
+  /biał|bial/i, /czarn/i, /szar/i, /grafit/i, /antracyt/i, /popiel/i,
+  /beż|bez\b/i, /kaszmir/i, /krem/i, /wanili/i, /oliwk/i,
+  /brąz|braz/i, /orzech/i, /dąb|dab|dęb|deb/i, /jesion/i, /akacj/i,
+  /wenge/i, /heban/i, /srebrn/i, /złot|zlot/i, /miodow/i, /piaskow/i,
+  /sonoma|fiord|toffee|hawana|mocca|czekolad/i,
+]
+
+/**
+ * Czy uzasadnienie przypisuje SKRZYDŁU nazwę koloru, której nie ma w nazwie
+ * wariantu produktu? Rodzina koloru tu nie wystarcza: "grafitowy" i "Szary"
+ * należą do tej samej rodziny (grey), a mimo to sugerują inny odcień — a klient
+ * czyta zdanie tuż obok zdjęcia. Zasada: wolno echem powtórzyć prawdziwy kolor
+ * z nazwy, nie wolno wprowadzać innego. Kolor przy rzeczowniku-detalu (czarne
+ * szkło, srebrne intarsje) jest dozwolony.
+ */
+export function reasonConflictsWithColor(why: string, productName: string): boolean {
+  const parts = productName.split(' - ')
+  const variant = parts.length > 1 ? parts.slice(1).join(' - ') : ''
+  if (!variant) return false // brak jawnego wariantu → nie ma z czym porównać
+
+  for (const stem of COLOR_WORD_STEMS) {
+    if (stem.test(variant)) continue // ten kolor JEST prawdziwy — wolno go użyć
+    const global = new RegExp(stem.source, 'gi')
+    let match: RegExpExecArray | null
+    while ((match = global.exec(why)) !== null) {
+      const after = why.slice(match.index, match.index + match[0].length + 24)
+      if (!DETAIL_NOUN_RE.test(after)) return true
+    }
+  }
+  return false
 }
 
 export function classifyDoor(name: string, description: string = ''): DoorAttributes {

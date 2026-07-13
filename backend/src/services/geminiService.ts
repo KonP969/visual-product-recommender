@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { Jimp } from 'jimp'
-import { COLOR_FAMILIES, ColorFamily } from './attributeService'
+import { COLOR_FAMILIES, ColorFamily, reasonConflictsWithColor } from './attributeService'
 
 // Free tier Google ma limit DZIENNY per model: 2.5-flash-lite i 2.5-flash po
 // ~20/dzień (rodzina 2.0 ma limit 0). Próbujemy modeli po kolei, więc dzienny
@@ -461,6 +461,8 @@ export function parseMatchReasons(
   return reasons
 }
 
+const REASONS_PROMPT_VERSION = 'v2-true-color'
+
 const REASONS_PROMPT_HEAD = `You are an interior design assistant. The customer's room needs a door matching this style (internal English query):
 
 `
@@ -468,6 +470,11 @@ const REASONS_PROMPT_HEAD = `You are an interior design assistant. The customer'
 const REASONS_PROMPT_RULES = `
 
 For each numbered product below, write ONE short Polish sentence explaining why it fits that style — point at a concrete visual link (color, finish, glass, panel style). Do not repeat the product name. Lowercase start, max 14 words.
+
+COLOR ACCURACY (critical — the customer sees the product photo next to your sentence):
+- Each product name ends with " - <Polish color>" (e.g. "- Szary", "- Biały", "- Dąb Naturalny"). That is the TRUE color.
+- If you mention color, use EXACTLY that word (or omit color entirely). NEVER substitute a different shade word — do not call "Szary" grafitowy/antracytowy/czarny, do not call "Biały" kremowy/beżowy, do not call "Dąb Naturalny" ciemny.
+- When unsure about the shade, write about finish, style or panel layout instead of color.
 
 Output ONLY a JSON array: [{"i": <product number as int>, "why": "<Polish sentence>"}]
 
@@ -482,7 +489,9 @@ export async function explainMatches(
 ): Promise<Record<string, string>> {
   if (candidates.length === 0) return {}
 
-  const key = clipQuery + '|' + candidates.map((c) => c.id).join(',')
+  // Wersja w kluczu: zmiana REASONS_PROMPT_* musi unieważnić uzasadnienia
+  // zapisane na dysku, inaczej stare (np. "grafitowy" o szarych drzwiach) żyją dalej.
+  const key = REASONS_PROMPT_VERSION + '|' + clipQuery + '|' + candidates.map((c) => c.id).join(',')
   const cached = cacheGet(reasonsCache, key)
   if (cached) {
     console.log('[GEMINI] Match reasons cache hit')
@@ -495,6 +504,17 @@ export async function explainMatches(
   const prompt = REASONS_PROMPT_HEAD + `"${clipQuery}"` + REASONS_PROMPT_RULES + productLines
 
   const reasons = parseMatchReasons(await generateJson([{ text: prompt }]), candidates)
+
+  // Twardy guard: prompt bywa łamany ("grafitowy odcień" o drzwiach Szary),
+  // a klient czyta to zdanie obok zdjęcia. Lepiej brak uzasadnienia niż błędne.
+  for (const c of candidates) {
+    const why = reasons[c.id]
+    if (why && reasonConflictsWithColor(why, c.name)) {
+      console.warn(`[GEMINI] Odrzucono uzasadnienie (kolor ≠ "${c.name}"): "${why}"`)
+      delete reasons[c.id]
+    }
+  }
+
   cacheSet(reasonsCache, key, reasons)
   return reasons
 }
@@ -539,6 +559,35 @@ export async function describeProductsBatch(
     if (typeof item.i === 'number' && item.d?.trim()) out[item.i] = item.d.trim()
   }
   return out
+}
+
+const GLASS_VISION_PROMPT = `You are inspecting a product photo of a single interior door leaf.
+
+Decide whether the DOOR LEAF itself contains any glass/glazed panes.
+- "glass": true if the leaf has one or more glass inserts of ANY kind — clear, frosted, milk/opal, tinted, black, or with muntins/szprosy. Frosted or milk-white panes on a light door STILL count as glass.
+- "glass": false ONLY if the leaf is fully solid (flat, flush, or raised wooden panels) with no glazing at all.
+- Ignore the surrounding wall, frame and floor. Judge only the door leaf.
+
+Output ONLY this JSON object: {"glass": true} or {"glass": false}`
+
+/**
+ * Wizyjne wykrycie szkła na packshocie drzwi — jedyny wiarygodny sygnał dla
+ * "cichych" modeli, których nazwa nie zdradza przeszklenia (np. CLASSIC HOME
+ * C.2). CLIP zero-shot tego nie rozróżnia; model wizyjny tak. Zwraca null, gdy
+ * odpowiedź jest niejednoznaczna (wtedy caller zostawia dotychczasową wartość).
+ */
+export async function classifyGlassFromImage(
+  imageBuffer: Buffer,
+  mimetype: string,
+): Promise<boolean | null> {
+  const prepared = await prepareImage(imageBuffer, mimetype)
+  const raw = await generateJson([
+    { text: GLASS_VISION_PROMPT },
+    { inlineData: { data: prepared.buffer.toString('base64'), mimeType: prepared.mimetype } },
+  ])
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  const parsed = JSON.parse(cleaned) as { glass?: unknown }
+  return typeof parsed.glass === 'boolean' ? parsed.glass : null
 }
 
 export async function describeDoorFromText(userQuery: string): Promise<DoorDescription> {

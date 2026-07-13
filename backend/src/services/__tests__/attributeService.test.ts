@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { classifyDoor, explicitColorFromQuery } from '../attributeService'
+import {
+  classifyDoor,
+  explicitColorFromQuery,
+  reasonConflictsWithColor,
+} from '../attributeService'
 import { buildWhere, applySeededJitter } from '../chromaService'
 import { parseDoorDescription } from '../geminiService'
 
@@ -142,5 +146,60 @@ describe('parseDoorDescription — filters', () => {
   it('missing filters → nulls', () => {
     const raw = JSON.stringify({ clip_query: 'door' })
     expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null })
+  })
+})
+
+describe('reasonConflictsWithColor — guard uzasadnień', () => {
+  const SZARY = 'PORTA VERRO model V.2 - Szary'
+  const DAB = 'PORTA NATURA model B.2 - Dąb Naturalny'
+
+  it('odrzuca odcień spoza nazwy wariantu (zgłoszony bug: grafitowy o Szary)', () => {
+    expect(
+      reasonConflictsWithColor('płaski panel i grafitowy odcień nadają minimalistyczny wygląd.', SZARY),
+    ).toBe(true)
+  })
+
+  it('przepuszcza echo prawdziwego koloru', () => {
+    expect(
+      reasonConflictsWithColor('gładka, szara powierzchnia pasuje do nowoczesnych wnętrz.', SZARY),
+    ).toBe(false)
+  })
+
+  it('przepuszcza kolor DETALU (czarne szkło na szarych drzwiach)', () => {
+    expect(
+      reasonConflictsWithColor('czarne szkło i gładki panel pasują do nowoczesnego designu.', SZARY),
+    ).toBe(false)
+  })
+
+  it('przepuszcza kolor detalu: srebrne intarsje', () => {
+    expect(
+      reasonConflictsWithColor('szary kolor i srebrne intarsje nadają nowoczesny charakter.', SZARY),
+    ).toBe(false)
+  })
+
+  it('odrzuca inną rodzinę koloru skrzydła', () => {
+    expect(reasonConflictsWithColor('biała powierzchnia rozjaśnia wnętrze.', SZARY)).toBe(true)
+  })
+
+  it('odrzuca podmianę gatunku drewna', () => {
+    expect(reasonConflictsWithColor('ciepły orzech ociepla salon.', DAB)).toBe(true)
+  })
+
+  it('przepuszcza echo gatunku drewna', () => {
+    expect(reasonConflictsWithColor('naturalny dąb ociepla wnętrze.', DAB)).toBe(false)
+  })
+
+  it('przepuszcza zdanie bez koloru', () => {
+    expect(
+      reasonConflictsWithColor('prosta forma skrzydła komponuje się z minimalizmem.', SZARY),
+    ).toBe(false)
+  })
+
+  it('modyfikatory względne (jasny/ciemny) nie są traktowane jak kolor', () => {
+    expect(reasonConflictsWithColor('jasna powierzchnia powiększa wnętrze.', SZARY)).toBe(false)
+  })
+
+  it('brak wariantu w nazwie → brak porównania', () => {
+    expect(reasonConflictsWithColor('grafitowy odcień.', 'PORTA BEZ WARIANTU')).toBe(false)
   })
 })
