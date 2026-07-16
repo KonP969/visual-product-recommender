@@ -11,19 +11,24 @@ import { parseFeedStreaming, FeedProduct } from '../services/feedParser'
 import { describeProductsBatch } from '../services/geminiService'
 import { getTextEmbedding } from '../services/clipService'
 import { classifyDoor } from '../services/attributeService'
-import { categorizeDoor } from '../services/chromaService'
+import { categorizeDoor, isDoorProduct } from '../services/chromaService'
 
 const FEED_URL = process.env.FEED_URL ?? 'https://www.porta.com.pl/product-feed.xml'
 const BATCH = 50
 
 async function main() {
   console.log(`[SYNC] Feed: ${FEED_URL}`)
-  const { products } = await parseFeedStreaming(FEED_URL, {
+  const { products: parsed } = await parseFeedStreaming(FEED_URL, {
     onProgress: (n) => {
       if (n % 2000 === 0) console.log(`[SYNC] parsowanie: ${n}`)
     },
   })
-  console.log(`[SYNC] Feed: ${products.length} produktów`)
+  // Odsiew klamek, wizjerów i ościeżnic. Skutek uboczny jest zamierzony:
+  // skoro nie trafiają do feedById, krok 1 usunie z bazy te zaimportowane
+  // wcześniej — czyszczenie katalogu jedzie tą samą ścieżką co wycofania.
+  const products = parsed.filter((p) => isDoorProduct(p.categoryMain))
+  const dropped = parsed.length - products.length
+  console.log(`[SYNC] Feed: ${products.length} drzwi (odsiano ${dropped} nie-drzwi z ${parsed.length})`)
   const feedById = new Map(products.map((p) => [p.id, p]))
 
   const client = new ChromaClient({ path: 'http://localhost:8000' })

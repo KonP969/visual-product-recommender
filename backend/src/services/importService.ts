@@ -1,7 +1,7 @@
 import { parseFeedStreaming } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
-import { upsertProduct, productExists, categorizeDoor } from './chromaService'
+import { upsertProduct, productExists, categorizeDoor, isDoorProduct } from './chromaService'
 import { classifyDoor } from './attributeService'
 
 export interface ImportProgress {
@@ -25,16 +25,23 @@ export interface ImportOptions {
 export async function runImport(source: string, options: ImportOptions = {}): Promise<ImportProgress> {
   console.log(`[IMPORT] Streaming parse: ${source}`)
 
-  const { products, stoppedEarly } = await parseFeedStreaming(source, {
+  const { products: parsed, stoppedEarly } = await parseFeedStreaming(source, {
     limit: options.limit,
     onProgress: options.onParseProgress,
   })
 
+  // Feed miesza z drzwiami klamki, wizjery i ościeżnice. Bez tego odsiewu
+  // wchodzą do katalogu jako drzwi (categorizeDoor to denylista) i wypływają
+  // w wynikach wyszukiwania.
+  const products = parsed.filter((p) => isDoorProduct(p.categoryMain))
+  const dropped = parsed.length - products.length
+
   const feedTotal = stoppedEarly ? null : products.length
 
   console.log(
-    `[IMPORT] Parsed ${products.length} products` +
-    (stoppedEarly ? ' (stopped at limit)' : ` (feed total: ${products.length})`),
+    `[IMPORT] Parsed ${parsed.length} products` +
+    (stoppedEarly ? ' (stopped at limit)' : ` (feed total: ${parsed.length})`) +
+    (dropped > 0 ? ` — odsiano ${dropped} nie-drzwi (klamki/akcesoria/ościeżnice)` : ''),
   )
 
   options.onParsed?.(feedTotal, products.length)

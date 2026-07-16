@@ -8,6 +8,8 @@ export interface FeedProduct {
   imageUrl: string
   price: string
   productUrl?: string
+  /** Typ oferty wprost z feedu (Ceneo: <category_main>) — rozstrzyga, czy to drzwi. */
+  categoryMain?: string
 }
 
 export interface StreamParseOptions {
@@ -33,6 +35,7 @@ function buildProduct(
       imageUrl,
       price: data['price'] ?? '—',
       productUrl: data['url_product'],
+      categoryMain: data['category_main'],
     }
   }
 
@@ -46,6 +49,7 @@ function buildProduct(
     imageUrl,
     price: data['g:price'] ?? data['price'] ?? '—',
     productUrl: data['g:link'] ?? data['link'],
+    categoryMain: data['g:product_type'] ?? data['product_type'],
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyMMR, categorizeDoor, SearchResultItem } from '../chromaService'
+import { applyMMR, categorizeDoor, isDoorProduct, SearchResultItem } from '../chromaService'
 
 function candidate(
   id: string,
@@ -25,6 +25,39 @@ describe('categorizeDoor', () => {
     ['Drzwi przeciwpożarowe EI30', 'specialty'],
   ])('categorizes "%s" as %s', (name, expected) => {
     expect(categorizeDoor(name)).toBe(expected)
+  })
+})
+
+describe('isDoorProduct — odsiew nie-drzwi z feedu', () => {
+  it.each([
+    ['Klamki', false],
+    ['Akcesoria', false],
+    ['Ościeżnice', false],
+  ])('kategoria "%s" → nie jest drzwiami', (cat, expected) => {
+    expect(isDoorProduct(cat)).toBe(expected)
+  })
+
+  it.each([
+    ['Drzwi wewnętrzne'],
+    ['Drzwi wejściowe do mieszkania'],
+    ['Drzwi techniczne'],
+    ['Drzwi szklane'],
+    ['Drzwi przesuwne'],
+    ['Drzwi składane'],
+    ['Porta Loft Steel'],
+  ])('kategoria "%s" → drzwi', (cat) => {
+    expect(isDoorProduct(cat)).toBe(true)
+  })
+
+  // 379 realnych drzwi w feedzie nie ma category_main (PORTA UNI KOLOR MODERN,
+  // CLASSIC C.2, KWARC …) — brak kategorii NIE MOŻE ich odsiewać.
+  it.each([undefined, null, ''])('brak kategorii (%s) → drzwi (nie odsiewamy)', (cat) => {
+    expect(isDoorProduct(cat)).toBe(true)
+  })
+
+  it('nie jest wrażliwa na wielkość liter i białe znaki', () => {
+    expect(isDoorProduct('  klamki  ')).toBe(false)
+    expect(isDoorProduct('AKCESORIA')).toBe(false)
   })
 })
 

@@ -55,6 +55,22 @@ export function categorizeDoor(name: string): 'residential' | 'specialty' {
   return COMMERCIAL_DOOR_PATTERNS.some((p) => p.test(name)) ? 'specialty' : 'residential'
 }
 
+// Kategorie feedu, które nie są skrzydłem drzwiowym: klamki, wizjery, zawiasy,
+// ościeżnice. Bez tego trafiają do katalogu jako drzwi — bo categorizeDoor to
+// denylista i wszystko nierozpoznane domyślnie zostaje 'residential'.
+const NON_DOOR_CATEGORIES = new Set(['klamki', 'akcesoria', 'ościeżnice'])
+
+/**
+ * Czy oferta z feedu jest drzwiami? Rozstrzyga `category_main`.
+ * Brak kategorii oznacza DRZWI — w feedzie Porty ~379 realnych modeli
+ * (PORTA UNI KOLOR MODERN, CLASSIC C.2, KWARC) nie ma tego pola, więc
+ * odsiewanie po jego braku skasowałoby prawdziwe produkty.
+ */
+export function isDoorProduct(categoryMain?: string | null): boolean {
+  if (!categoryMain) return true
+  return !NON_DOOR_CATEGORIES.has(categoryMain.trim().toLowerCase())
+}
+
 export async function productExists(id: string): Promise<boolean> {
   const col = await getCollection()
   const result = await col.get({ ids: [id] })
