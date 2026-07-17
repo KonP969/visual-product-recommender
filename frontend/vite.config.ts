@@ -1,13 +1,17 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+const config = {
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  test: {
+    environment: 'node',
   },
   server: {
     proxy: {
@@ -17,4 +21,6 @@ export default defineConfig({
       },
     },
   },
-})
+}
+
+export default defineConfig(config)
