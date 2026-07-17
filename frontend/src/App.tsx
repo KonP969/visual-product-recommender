@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Settings } from 'lucide-react'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useSearch } from '@/hooks/useSearch'
+import { useRefinement } from '@/hooks/useRefinement'
+import type { Grupa } from '@/lib/refinement'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { DropZone } from '@/components/DropZone'
@@ -21,7 +23,23 @@ export default function App() {
   const { appState, searchStage, searchResult, errorMessage, search, refine, reset: resetSearch } = useSearch()
   const [showAdmin, setShowAdmin] = useState(false)
 
+  const refinement = useRefinement()
+
+  // Baza = displayPl PIERWSZEGO wyniku. ustawBazę zamraża po pierwszym ustawieniu,
+  // więc kolejne (tekstowe) wyniki jej nie nadpisują — tu ginie dryf.
+  const { ustawBazę } = refinement
+  useEffect(() => {
+    const pl = searchResult?.displayDescription
+    if (pl) ustawBazę(pl)
+  }, [searchResult, ustawBazę])
+
+  const handleChip = (etykieta: string, grupa: Grupa) => refine(refinement.chip(etykieta, grupa))
+  const handleText = (text: string) => refine(refinement.tekst(text))
+  const handleRemove = (index: number) => refine(refinement.usuń(index))
+  const handleUndo = () => refine(refinement.cofnijKrok())
+
   const handleReset = () => {
+    refinement.zeruj()
     resetFile()
     resetSearch()
   }
@@ -93,11 +111,15 @@ export default function App() {
           <div className="grid items-start gap-10 lg:grid-cols-[360px_1fr] lg:gap-12">
             <Rail
               previewUrl={previewUrl}
-              displayDescription={searchResult?.displayDescription ?? null}
+              baza={refinement.stan.baza}
+              kroki={refinement.stan.kroki}
               busy={appState === 'loading'}
               validationError={validationError}
               onFile={handleFileSelected}
-              onRefine={refine}
+              onChip={handleChip}
+              onText={handleText}
+              onRemove={handleRemove}
+              onUndo={handleUndo}
               onReset={handleReset}
             />
             <SearchResults
