@@ -54,6 +54,11 @@ export function Rail({
 
   return (
     <aside className="flex flex-col gap-6 lg:sticky lg:top-6">
+      <div className="sr-only" aria-live="polite">
+        {kroki.length > 0
+          ? `Aktywne doprecyzowania: ${kroki.map((k) => k.etykieta).join(', ')}.`
+          : 'Brak doprecyzowań.'}
+      </div>
       <figure className="m-0 overflow-hidden rounded-2xl shadow-[0_18px_40px_-24px_rgba(38,34,28,0.45)]">
         <img
           src={previewUrl}
@@ -92,7 +97,7 @@ export function Rail({
       )}
 
       {kroki.length > 0 && (
-        <div aria-live="polite">
+        <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[11px] uppercase tracking-[0.12em] text-ink-soft">
               Doprecyzowanie

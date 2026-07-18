@@ -76,6 +76,14 @@ describe('dodajKrok — baza null (Gemini padł / low-similarity)', () => {
     expect(s.kroki).toHaveLength(1)
     expect(s.kroki[0].etykieta).toBe('bez przeszklenia')
   })
+
+  it('baza=null: ponowny klik chipa-bazy dokłada duplikat (zachowanie zgodne ze spec, bez żetonu)', () => {
+    let s = dodajKrok(baza(null), 'klasyczne', 'styl') // pierwszy chip → staje się bazą
+    s = dodajKrok(s, 'klasyczne', 'styl')              // kroki puste → toggle nie łapie → dopisany krok
+    expect(s.baza).toBe('klasyczne')
+    expect(s.kroki).toHaveLength(1)
+    expect(budujZapytanie(s)).toBe('klasyczne, klasyczne')
+  })
 })
 
 describe('usuńKrok / cofnij / wyczyść', () => {
