@@ -120,6 +120,10 @@ export async function resolveGlassForProducts(nowe: NowyProdukt[]): Promise<Wyni
       const model = queue.shift()!
       const variants = byModel.get(model)!
       const rep = variants.find((v) => v.imageUrl) ?? variants[0]
+      if (!rep.imageUrl) {
+        result.failed++
+        continue
+      }
       try {
         const glass = await visionDecision(rep.imageUrl)
         result.visionCalls++
@@ -129,7 +133,6 @@ export async function resolveGlassForProducts(nowe: NowyProdukt[]): Promise<Wyni
         }
         decisions.set(model, glass)
       } catch {
-        result.visionCalls++
         result.failed++
       }
     }

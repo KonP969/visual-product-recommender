@@ -135,8 +135,12 @@ async function main() {
 
   if (dodane.length > 0) {
     console.log(`[SYNC] Wizyjne szkło dla ${dodane.length} nowych…`)
-    const glass = await resolveGlassForProducts(dodane)
-    console.log(`[SYNC] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
+    try {
+      const glass = await resolveGlassForProducts(dodane)
+      console.log(`[SYNC] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
+    } catch (err) {
+      console.warn('[SYNC] Wizyjne szkło padło (pomijam):', err instanceof Error ? err.message : err)
+    }
   }
 
   const finalCount = await col.count()
