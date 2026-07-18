@@ -3,6 +3,7 @@ import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct, productExists, categorizeDoor, isDoorProduct } from './chromaService'
 import { classifyDoor } from './attributeService'
+import { resolveGlassForProducts } from './glassResolver'
 
 export interface ImportProgress {
   current: number
@@ -49,6 +50,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   let success = 0
   let skipped = 0
   let failed = 0
+  const dodane: { id: string; name: string; imageUrl: string }[] = []
 
   for (let i = 0; i < products.length; i++) {
     const product = products[i]
@@ -75,6 +77,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
           lightness: attrs.lightness,
         })
         success++
+        dodane.push({ id: product.id, name: product.name, imageUrl: product.imageUrl })
         console.log(`[IMPORT] ${label} ✓ ${product.name}`)
       }
     } catch (err) {
@@ -91,6 +94,16 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
       skipped,
       failed,
     })
+  }
+
+  if (dodane.length > 0) {
+    console.log(`[IMPORT] Wizyjne szkło dla ${dodane.length} nowych…`)
+    try {
+      const glass = await resolveGlassForProducts(dodane)
+      console.log(`[IMPORT] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
+    } catch (err) {
+      console.warn('[IMPORT] Wizyjne szkło padło (pomijam):', err instanceof Error ? err.message : err)
+    }
   }
 
   const result: ImportProgress = {

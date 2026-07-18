@@ -12,6 +12,7 @@ import { describeProductsBatch } from '../services/geminiService'
 import { getTextEmbedding } from '../services/clipService'
 import { classifyDoor } from '../services/attributeService'
 import { categorizeDoor, isDoorProduct } from '../services/chromaService'
+import { resolveGlassForProducts } from '../services/glassResolver'
 
 const FEED_URL = process.env.FEED_URL ?? 'https://www.porta.com.pl/product-feed.xml'
 const BATCH = 50
@@ -84,6 +85,7 @@ async function main() {
 
   let indexed = 0
   let failed = 0
+  const dodane: { id: string; name: string; imageUrl: string }[] = []
   for (let b = 0; b < newProducts.length; b += BATCH) {
     const batch = newProducts.slice(b, b + BATCH)
     try {
@@ -103,6 +105,7 @@ async function main() {
         const embedding = await getTextEmbedding(desc)
         const attrs = classifyDoor(p.name, desc)
         ids.push(p.id)
+        dodane.push({ id: p.id, name: p.name, imageUrl: p.imageUrl })
         embeddings.push(embedding)
         metadatas.push({
           name: p.name,
@@ -126,6 +129,12 @@ async function main() {
       failed += batch.length
       console.warn(`[SYNC] batch ${Math.floor(b / BATCH) + 1} padł:`, err instanceof Error ? err.message.slice(0, 120) : err)
     }
+  }
+
+  if (dodane.length > 0) {
+    console.log(`[SYNC] Wizyjne szkło dla ${dodane.length} nowych…`)
+    const glass = await resolveGlassForProducts(dodane)
+    console.log(`[SYNC] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
   }
 
   const finalCount = await col.count()
