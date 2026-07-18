@@ -17,11 +17,9 @@
 import 'dotenv/config'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
-import axios from 'axios'
 import { ChromaClient } from 'chromadb'
-import { GLASS_RE, SOLID_NAME_RE } from '../services/attributeService'
 import { categorizeDoor } from '../services/chromaService'
-import { classifyGlassFromImage } from '../services/geminiService'
+import { modelOf, decideGlassFromName, visionDecision } from '../services/glassResolver'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const PROGRESS_FILE = join(__dirname, '..', '..', '..', 'scripts', 'backfill_glass_progress.json')
@@ -41,8 +39,6 @@ interface Decision {
   source: Source
 }
 
-const modelOf = (name: string): string => name.split(' - ')[0].trim()
-
 function loadProgress(): Record<string, Decision> {
   try {
     if (existsSync(PROGRESS_FILE)) return JSON.parse(readFileSync(PROGRESS_FILE, 'utf8'))
@@ -55,22 +51,6 @@ function loadProgress(): Record<string, Decision> {
 function saveProgress(p: Record<string, Decision>): void {
   mkdirSync(dirname(PROGRESS_FILE), { recursive: true })
   writeFileSync(PROGRESS_FILE, JSON.stringify(p, null, 2))
-}
-
-async function visionDecision(imageUrl: string): Promise<boolean | null> {
-  const res = await axios.get<ArrayBuffer>(imageUrl, {
-    responseType: 'arraybuffer',
-    timeout: 30_000,
-    headers: { 'User-Agent': 'VisualProductRecommender/1.0' },
-  })
-  const buffer = Buffer.from(res.data)
-  const ct = String(res.headers['content-type'] ?? '')
-  const mimetype = ct.startsWith('image/')
-    ? ct
-    : imageUrl.toLowerCase().includes('.png')
-      ? 'image/png'
-      : 'image/jpeg'
-  return classifyGlassFromImage(buffer, mimetype)
 }
 
 async function main() {
@@ -114,10 +94,9 @@ async function main() {
   const silentModels: string[] = []
   for (const [model, variants] of byModel) {
     if (progress[model]) continue
-    const anyGlassName = variants.some((v) => GLASS_RE.test(v.name))
-    const anySolidName = variants.some((v) => SOLID_NAME_RE.test(v.name))
-    if (anyGlassName) progress[model] = { glass: true, source: 'name-glass' }
-    else if (anySolidName) progress[model] = { glass: false, source: 'name-solid' }
+    const fromName = decideGlassFromName(variants.map((v) => v.name))
+    if (fromName === true) progress[model] = { glass: true, source: 'name-glass' }
+    else if (fromName === false) progress[model] = { glass: false, source: 'name-solid' }
     else silentModels.push(model)
   }
   saveProgress(progress)
