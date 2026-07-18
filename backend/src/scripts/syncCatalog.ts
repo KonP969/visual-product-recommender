@@ -95,6 +95,7 @@ async function main() {
       const ids: string[] = []
       const embeddings: number[][] = []
       const metadatas: Record<string, unknown>[] = []
+      const batchDodane: { id: string; name: string; imageUrl: string }[] = []
       for (let i = 0; i < batch.length; i++) {
         const p = batch[i]
         const desc = descriptions[i + 1]
@@ -105,7 +106,7 @@ async function main() {
         const embedding = await getTextEmbedding(desc)
         const attrs = classifyDoor(p.name, desc)
         ids.push(p.id)
-        dodane.push({ id: p.id, name: p.name, imageUrl: p.imageUrl })
+        batchDodane.push({ id: p.id, name: p.name, imageUrl: p.imageUrl })
         embeddings.push(embedding)
         metadatas.push({
           name: p.name,
@@ -123,6 +124,7 @@ async function main() {
       if (ids.length > 0) {
         await col.upsert({ ids, embeddings, metadatas: metadatas as any })
         indexed += ids.length
+        dodane.push(...batchDodane)
       }
       console.log(`[SYNC] batch ${Math.floor(b / BATCH) + 1}/${Math.ceil(newProducts.length / BATCH)}: +${ids.length} (razem ${indexed})`)
     } catch (err) {
