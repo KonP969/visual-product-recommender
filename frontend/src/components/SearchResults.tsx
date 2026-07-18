@@ -1,5 +1,5 @@
 import { Loader2, AlertCircle, PackageSearch, SearchX, Sparkles, ScanSearch, Lightbulb } from 'lucide-react'
-import { AppState, SearchResult, SearchStage } from '@/types'
+import type { AppState, SearchResult, SearchStage } from '@/types'
 import { ResultsGrid } from './ResultsGrid'
 import { ProductCard } from './ProductCard'
 

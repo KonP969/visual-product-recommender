@@ -1,7 +1,8 @@
-import { useRef, useState, DragEvent, ChangeEvent } from 'react'
+import { useRef, useState } from 'react'
+import type { DragEvent, ChangeEvent } from 'react'
 import { Upload, ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FileValidationError } from '@/types'
+import type { FileValidationError } from '@/types'
 
 interface DropZoneProps {
   previewUrl: string | null

@@ -1,4 +1,4 @@
-import { ApiResponse, SearchResult, SearchStage } from '@/types'
+import type { ApiResponse, SearchResult, SearchStage } from '@/types'
 
 const BASE_URL = '/api'
 

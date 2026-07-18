@@ -1,4 +1,4 @@
-import { ApiResponse, SearchResult } from '@/types'
+import type { ApiResponse, SearchResult } from '@/types'
 
 const MOCK_PRODUCTS = [
   {
