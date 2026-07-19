@@ -19,6 +19,7 @@ export interface DoorAttributes {
   hasGlass: boolean
   /** 1 = najciemniejsze (czerń), 5 = najjaśniejsze (biel) */
   lightness: number
+  styles: Style[]
 }
 
 export const LIGHTNESS: Record<ColorFamily, number> = {
@@ -34,6 +35,64 @@ export const LIGHTNESS: Record<ColorFamily, number> = {
 export const GLASS_RE = /szyb|bulaj|przeszkl|witryn|glass|szpros|frosted|glazed/i
 // Nazwa jawnie deklarująca brak szkła — wtedy ufamy nazwie, nie wizji.
 export const SOLID_NAME_RE = /pe[łl]ne/i
+
+export const STYLES = [
+  'klasyczny',
+  'nowoczesny',
+  'minimalistyczny',
+  'rustykalny',
+  'loft',
+  'skandynawski',
+  'glamour',
+] as const
+export type Style = (typeof STYLES)[number]
+
+// Styl czytamy z angielskiego opisu (już w metadanych) — nie z nazwy ani wizji.
+// Multi-label: drzwi dostają KAŻDY styl, którego sygnał pojawia się w opisie,
+// więc nie zmuszamy ich do jednego arbitralnego kubełka (mniejsze ryzyko przy
+// twardym filtrze). Słowa-nastroje ("elegant") i konstrukcja ("flat panel")
+// świadomie POMINIĘTE — to nie style.
+const STYLE_SIGNALS: Array<[Style, RegExp]> = [
+  ['klasyczny', /\bclassic|traditional|raised[ -]?panel/i],
+  ['nowoczesny', /\bmodern|contemporary/i],
+  ['minimalistyczny', /minimalist/i],
+  ['rustykalny', /rustic|farmhouse|knotty/i],
+  ['loft', /\bloft|industrial/i],
+  ['skandynawski', /scandinav|nordic/i],
+  ['glamour', /glamou?r|luxur|ornate|baroque|ozdobn/i],
+]
+
+export function classifyStyles(description: string): Style[] {
+  return STYLE_SIGNALS.filter(([, re]) => re.test(description)).map(([s]) => s)
+}
+
+// Flagi boolean do metadanych Chromy (multi-label nie mieści się w skalarze).
+// style_none = true, gdy opis nie dał żadnego stylu — te drzwi filtr stylu
+// NIGDY nie odcina (zabezpieczenie: patrz buildWhere).
+export function styleFlags(styles: Style[]): Record<string, boolean> {
+  const flags: Record<string, boolean> = {}
+  for (const s of STYLES) flags['style_' + s] = styles.includes(s)
+  flags['style_none'] = styles.length === 0
+  return flags
+}
+
+// Jawnie nazwany POJEDYNCZY styl w tekście → enum. Zero lub wiele → null
+// (wtedy ufamy LLM-owi). Bliźniak explicitColorFromQuery.
+const EXPLICIT_STYLE_TERMS: Array<[RegExp, Style]> = [
+  [/klasyczn|\bclassic/i, 'klasyczny'],
+  [/nowoczesn|\bmodern\w*/i, 'nowoczesny'],
+  [/minimalist/i, 'minimalistyczny'],
+  [/rustykaln|rustic/i, 'rustykalny'],
+  [/\bloft\w*|industrial/i, 'loft'],
+  [/skandynawsk|scandinav|nordyck/i, 'skandynawski'],
+  [/glamou?r|glamur/i, 'glamour'],
+]
+
+export function explicitStyleFromQuery(query: string): Style | null {
+  const found = new Set<Style>()
+  for (const [re, s] of EXPLICIT_STYLE_TERMS) if (re.test(query)) found.add(s)
+  return found.size === 1 ? [...found][0] : null
+}
 
 // Kolejność ma znaczenie: pierwsza pasująca reguła wygrywa.
 // Wariant polski (część nazwy po " - ") np. "Dąb Matowy Ciemny", "Czarny Struktura".
@@ -161,9 +220,12 @@ export function classifyDoor(name: string, description: string = ''): DoorAttrib
   // skrzydło — dlatego bazy NIE klasyfikujemy po polsku, tylko z opisu EN).
   if (!colorFamily) colorFamily = classifyDescription(description)
 
+  const styles = classifyStyles(description)
+
   return {
     colorFamily: colorFamily ?? 'unknown',
     hasGlass,
     lightness: colorFamily ? LIGHTNESS[colorFamily] : 3,
+    styles,
   }
 }

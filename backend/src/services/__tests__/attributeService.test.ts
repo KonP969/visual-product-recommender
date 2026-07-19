@@ -3,6 +3,10 @@ import {
   classifyDoor,
   explicitColorFromQuery,
   reasonConflictsWithColor,
+  classifyStyles,
+  styleFlags,
+  explicitStyleFromQuery,
+  STYLES,
 } from '../attributeService'
 import { buildWhere, applySeededJitter } from '../chromaService'
 import { parseDoorDescription } from '../geminiService'
@@ -146,6 +150,61 @@ describe('parseDoorDescription — filters', () => {
   it('missing filters → nulls', () => {
     const raw = JSON.stringify({ clip_query: 'door' })
     expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null })
+  })
+})
+
+describe('classifyStyles — multi-label z opisu', () => {
+  it('modern minimalist → [nowoczesny, minimalistyczny]', () => {
+    expect(classifyStyles('white modern minimalist flat panel door')).toEqual(
+      ['nowoczesny', 'minimalistyczny'],
+    )
+  })
+  it('classic raised panel → [klasyczny]', () => {
+    expect(classifyStyles('warm oak classic raised panel residential door')).toEqual(['klasyczny'])
+  })
+  it('loft/industrial → [loft]', () => {
+    expect(classifyStyles('black industrial loft steel door')).toContain('loft')
+  })
+  it('brak sygnału → [] (unknown)', () => {
+    expect(classifyStyles('a door for a room')).toEqual([])
+  })
+  it('kolejność wyniku zgodna z STYLES', () => {
+    // "scandinavian classic" → klasyczny przed skandynawski (kolejność STYLES)
+    const r = classifyStyles('scandinavian classic door')
+    expect(r).toEqual(['klasyczny', 'skandynawski'])
+  })
+})
+
+describe('styleFlags', () => {
+  it('ustawia flagi obecnych stylów + style_none=false', () => {
+    const f = styleFlags(['klasyczny', 'loft'])
+    expect(f.style_klasyczny).toBe(true)
+    expect(f.style_loft).toBe(true)
+    expect(f.style_nowoczesny).toBe(false)
+    expect(f.style_none).toBe(false)
+  })
+  it('pusty zbiór → style_none=true, reszta false', () => {
+    const f = styleFlags([])
+    expect(f.style_none).toBe(true)
+    expect(STYLES.every((s) => f['style_' + s] === false)).toBe(true)
+  })
+})
+
+describe('explicitStyleFromQuery', () => {
+  it.each([
+    ['drzwi klasyczne', 'klasyczny'],
+    ['loftowe drzwi', 'loft'],
+    ['nowoczesne drzwi', 'nowoczesny'],
+    ['drzwi w stylu skandynawskim', 'skandynawski'],
+    ['rustykalne drzwi', 'rustykalny'],
+  ])('%s → %s', (q, expected) => {
+    expect(explicitStyleFromQuery(q)).toBe(expected)
+  })
+  it.each([
+    'nowoczesne albo klasyczne', // dwa style → null
+    'jasne drewniane drzwi', // brak stylu
+  ])('%s → null', (q) => {
+    expect(explicitStyleFromQuery(q)).toBeNull()
   })
 })
 
