@@ -10,7 +10,7 @@ import { ChromaClient } from 'chromadb'
 import { parseFeedStreaming, FeedProduct } from '../services/feedParser'
 import { describeProductsBatch } from '../services/geminiService'
 import { getTextEmbedding } from '../services/clipService'
-import { classifyDoor } from '../services/attributeService'
+import { classifyDoor, styleFlags } from '../services/attributeService'
 import { categorizeDoor, isDoorProduct } from '../services/chromaService'
 import { resolveGlassForProducts } from '../services/glassResolver'
 
@@ -119,6 +119,7 @@ async function main() {
           color_family: attrs.colorFamily,
           has_glass: attrs.hasGlass,
           lightness: attrs.lightness,
+          ...styleFlags(attrs.styles),
         })
       }
       if (ids.length > 0) {

@@ -2,7 +2,7 @@ import { parseFeedStreaming } from './feedParser'
 import { downloadImage } from './imageDownloader'
 import { getEmbedding } from './clipService'
 import { upsertProduct, productExists, categorizeDoor, isDoorProduct } from './chromaService'
-import { classifyDoor } from './attributeService'
+import { classifyDoor, styleFlags } from './attributeService'
 import { resolveGlassForProducts } from './glassResolver'
 
 export interface ImportProgress {
@@ -64,6 +64,10 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
       } else {
         const { buffer, mimetype } = await downloadImage(product.imageUrl)
         const embedding = await getEmbedding(buffer, mimetype)
+        // Import z UI woła classifyDoor bez opisu (ścieżka jest obrazowa,
+        // opis nie istnieje na tym etapie) → attrs.styles zawsze [] →
+        // style_none: true. Zamierzone: takie drzwi filtr stylu nigdy nie
+        // odcina (zabezpieczenie), więc zawsze są pokazywane.
         const attrs = classifyDoor(product.name)
         await upsertProduct(product.id, embedding, {
           name: product.name,
@@ -75,6 +79,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
           color_family: attrs.colorFamily,
           has_glass: attrs.hasGlass,
           lightness: attrs.lightness,
+          ...styleFlags(attrs.styles),
         })
         success++
         dodane.push({ id: product.id, name: product.name, imageUrl: product.imageUrl })
