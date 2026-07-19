@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { ChromaClient, Collection } from 'chromadb'
+import type { Style } from './attributeService'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const COLLECTION_NAME = 'products'
@@ -27,11 +28,20 @@ export interface ProductMetadata {
   color_family?: string
   has_glass?: boolean
   lightness?: number
+  style_klasyczny?: boolean
+  style_nowoczesny?: boolean
+  style_minimalistyczny?: boolean
+  style_rustykalny?: boolean
+  style_loft?: boolean
+  style_skandynawski?: boolean
+  style_glamour?: boolean
+  style_none?: boolean
 }
 
 export interface HardFilters {
   colors?: string[] | null
   glass?: boolean | null
+  style?: Style | null
 }
 
 export interface SearchResultItem {
@@ -145,6 +155,10 @@ export function buildWhere(filters?: HardFilters): Record<string, unknown> {
   }
   if (filters?.glass === true || filters?.glass === false) {
     conditions.push({ has_glass: filters.glass })
+  }
+  if (filters?.style) {
+    // Styl LUB bezstylowe — bezstylowych (ubogi opis) nigdy nie chowamy.
+    conditions.push({ $or: [{ ['style_' + filters.style]: true }, { style_none: true }] })
   }
   return conditions.length === 1 ? conditions[0] : { $and: conditions }
 }

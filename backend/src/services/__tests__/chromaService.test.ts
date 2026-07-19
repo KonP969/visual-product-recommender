@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyMMR, categorizeDoor, isDoorProduct, SearchResultItem } from '../chromaService'
+import { applyMMR, buildWhere, categorizeDoor, isDoorProduct, SearchResultItem } from '../chromaService'
 
 function candidate(
   id: string,
@@ -99,5 +99,27 @@ describe('applyMMR', () => {
   it('strips embeddings from returned items', () => {
     const results = applyMMR([candidate('a', 0.9, [1, 0])], 1)
     expect(results[0]).not.toHaveProperty('embedding')
+  })
+})
+
+describe('buildWhere — filtr stylu z zabezpieczeniem', () => {
+  it('styl → $or (styl LUB bezstylowe)', () => {
+    const where = buildWhere({ style: 'klasyczny' }) as { $and?: unknown[] }
+    // przy samym stylu: pojedynczy warunek NIE jest owijany w $and, chyba że jest też category
+    const cond = JSON.stringify(where)
+    expect(cond).toContain('style_klasyczny')
+    expect(cond).toContain('style_none')
+  })
+
+  it('styl łączy się z kolorem przez $and', () => {
+    const where = buildWhere({ colors: ['black'], style: 'loft' }) as { $and: unknown[] }
+    expect(where.$and).toContainEqual({ color_family: { $in: ['black'] } })
+    expect(where.$and).toContainEqual({
+      $or: [{ style_loft: true }, { style_none: true }],
+    })
+  })
+
+  it('brak stylu → brak warunku stylu', () => {
+    expect(JSON.stringify(buildWhere({ colors: ['white'] }))).not.toContain('style_')
   })
 })
