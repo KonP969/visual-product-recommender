@@ -136,7 +136,7 @@ describe('parseDoorDescription — filters', () => {
       display_pl: 'czarne drzwi',
       filters: { colors: ['black'], glass: false },
     })
-    expect(parseDoorDescription(raw).filters).toEqual({ colors: ['black'], glass: false })
+    expect(parseDoorDescription(raw).filters).toEqual({ colors: ['black'], glass: false, style: null })
   })
 
   it('drops invalid color values, nulls empty', () => {
@@ -144,12 +144,21 @@ describe('parseDoorDescription — filters', () => {
       clip_query: 'door',
       filters: { colors: ['neon-pink'], glass: 'maybe' },
     })
-    expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null })
+    expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null, style: null })
   })
 
   it('missing filters → nulls', () => {
     const raw = JSON.stringify({ clip_query: 'door' })
-    expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null })
+    expect(parseDoorDescription(raw).filters).toEqual({ colors: null, glass: null, style: null })
+  })
+
+  it('parsuje style z listy STYLES, odrzuca spoza', () => {
+    const ok = JSON.stringify({ clip_query: 'x', filters: { style: 'loft' } })
+    expect(parseDoorDescription(ok).filters.style).toBe('loft')
+    const bad = JSON.stringify({ clip_query: 'x', filters: { style: 'brutalist' } })
+    expect(parseDoorDescription(bad).filters.style).toBeNull()
+    const none = JSON.stringify({ clip_query: 'x', filters: {} })
+    expect(parseDoorDescription(none).filters.style).toBeNull()
   })
 })
 

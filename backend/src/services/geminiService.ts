@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { Jimp } from 'jimp'
-import { COLOR_FAMILIES, ColorFamily, reasonConflictsWithColor } from './attributeService'
+import { COLOR_FAMILIES, ColorFamily, STYLES, Style, reasonConflictsWithColor } from './attributeService'
 
 // Free tier Google ma limit DZIENNY per model: 2.5-flash-lite i 2.5-flash po
 // ~20/dzień (rodzina 2.0 ma limit 0). Próbujemy modeli po kolei, więc dzienny
@@ -47,6 +47,7 @@ Semantics:
 - "pełne", "bez przeszklenia", "bez szyby", "solid" → glass: false
 - "ze szkłem", "przeszklone", "z szybą", "witryna" → glass: true
 - glass MUST stay null unless the customer explicitly mentions glazing (a "flat panel" or style word is NOT a glazing constraint).
+- "style": ONE of ["klasyczny","nowoczesny","minimalistyczny","rustykalny","loft","skandynawski","glamour"] when the customer explicitly names a style, else null. "klasyczne"/"classic" → "klasyczny"; "nowoczesne"/"modern" → "nowoczesny"; "loftowe"/"industrial" → "loft"; "rustykalne" → "rustykalny"; "minimalistyczne" → "minimalistyczny"; "skandynawskie" → "skandynawski"; "glamour"/"eleganckie" → "glamour". A finish or panel shape alone (e.g. "flat panel") is NOT a style constraint — leave style null unless the customer names the style.
 - Relative adjustments: "jaśniejsze" → colors = families strictly LIGHTER than the base description's family (NEVER include the base family or anything darker); "ciemniejsze" → strictly darker.
 
 Worked example: base "ciemnozielone, matowe drzwi" + "ale jaśniejsze":
@@ -64,8 +65,8 @@ DESIGNER METHOD (follow in this order):
 Output a JSON object with exactly four keys:
 - "clip_query": English phrase for CLIP search describing the SAFE recommendation (walls/floor-driven)
 - "display_pl": short Polish description of the safe recommendation
-- "filters": {"colors": [...], "glass": null} — 1-2 color families for the safe pick
-- "wild": {"clip_query": ..., "display_pl": ..., "why_pl": ..., "filters": {"colors": [...], "glass": null}} — the bold alternative; "why_pl" is ONE Polish sentence (max 18 words) explaining the designer's reasoning, referencing concrete features of THIS room
+- "filters": {"colors": [...], "glass": null, "style": <one of the 7 or null>} — 1-2 color families for the safe pick
+- "wild": {"clip_query": ..., "display_pl": ..., "why_pl": ..., "filters": {"colors": [...], "glass": null, "style": <one of the 7 or null>}} — the bold alternative; "why_pl" is ONE Polish sentence (max 18 words) explaining the designer's reasoning, referencing concrete features of THIS room
 
 ${CLIP_QUERY_RULES}
 - The clip_query MUST include the 2-3 style adjectives from step 3 — two different bright rooms must produce DIFFERENT queries.
@@ -85,7 +86,7 @@ The description may contain relative adjustments after "ale" (e.g. "ale jaśniej
 Output a JSON object with exactly three keys:
 - "clip_query": an English phrase optimized for CLIP text-to-image search
 - "display_pl": a short Polish description of the same door, shown back to the customer
-- "filters": {"colors": [...] or null, "glass": true/false/null} — derived STRICTLY from the customer's constraints
+- "filters": {"colors": [...] or null, "glass": true/false/null, "style": <one of the 7 or null>} — derived STRICTLY from the customer's constraints
 
 ${CLIP_QUERY_RULES}
 
@@ -101,6 +102,7 @@ Customer's description:
 export interface SearchFilters {
   colors: ColorFamily[] | null
   glass: boolean | null
+  style: Style | null
 }
 
 export interface WildCard {
@@ -205,9 +207,9 @@ function cacheSet<T>(cache: Map<string, T>, key: string, value: T): void {
 }
 
 function parseFilters(raw: unknown): SearchFilters {
-  const empty: SearchFilters = { colors: null, glass: null }
+  const empty: SearchFilters = { colors: null, glass: null, style: null }
   if (!raw || typeof raw !== 'object') return empty
-  const f = raw as { colors?: unknown; glass?: unknown }
+  const f = raw as { colors?: unknown; glass?: unknown; style?: unknown }
 
   let colors: ColorFamily[] | null = null
   if (Array.isArray(f.colors)) {
@@ -217,7 +219,8 @@ function parseFilters(raw: unknown): SearchFilters {
     colors = valid.length > 0 ? valid : null
   }
   const glass = typeof f.glass === 'boolean' ? f.glass : null
-  return { colors, glass }
+  const style = STYLES.includes(f.style as Style) ? (f.style as Style) : null
+  return { colors, glass, style }
 }
 
 interface RawDescription {
@@ -409,7 +412,7 @@ async function prepareImage(
 
 // Zmiana promptu unieważnia cache — inaczej stare odpowiedzi (bez nowych pól,
 // ze starą strategią) przeżywałyby na dysku dowolnie długo.
-const PROMPT_VERSION = 'v4-strict-color'
+const PROMPT_VERSION = 'v5-style'
 
 export async function describeRoomForDoorMatching(
   imageBuffer: Buffer,

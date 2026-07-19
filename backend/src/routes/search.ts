@@ -9,7 +9,7 @@ import {
   explainMatches,
   DoorDescription,
 } from '../services/geminiService'
-import { explicitColorFromQuery } from '../services/attributeService'
+import { explicitColorFromQuery, explicitStyleFromQuery } from '../services/attributeService'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -191,6 +191,14 @@ searchRouter.post('/search-text', async (req, res) => {
     if (explicitColors) {
       description.filters = { ...description.filters, colors: explicitColors }
       console.log(`[SEARCH-TEXT] Guard: wymuszono kolor ${JSON.stringify(explicitColors)}`)
+    }
+
+    // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard z tekstu.
+    const bodyStyle = typeof req.body?.style === 'string' ? req.body.style : null
+    const style = bodyStyle ?? explicitStyleFromQuery(query)
+    if (style) {
+      description.filters = { ...description.filters, style: style as any }
+      console.log(`[SEARCH-TEXT] Guard: wymuszono styl ${style}`)
     }
 
     send({ type: 'progress', stage: 'matching' })

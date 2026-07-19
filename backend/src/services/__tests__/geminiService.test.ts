@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseDoorDescription } from '../geminiService'
 
-const NO_FILTERS = { colors: null, glass: null }
+const NO_FILTERS = { colors: null, glass: null, style: null }
 
 describe('parseDoorDescription', () => {
   it('parses a plain JSON response', () => {
