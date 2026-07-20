@@ -226,7 +226,7 @@ export async function searchSimilar(
   let candidates = await queryCandidates(embedding, candidateN, buildWhere(filters))
 
   // Awaryjnie (dane sprzed backfillu kategorii): tylko gdy nie było filtrów.
-  if (candidates.length === 0 && !filters?.colors && filters?.glass == null) {
+  if (candidates.length === 0 && !filters?.colors && filters?.glass == null && filters?.style == null) {
     const all = await queryCandidates(embedding, candidateN)
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
   }

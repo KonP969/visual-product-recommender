@@ -9,7 +9,8 @@ import {
   explainMatches,
   DoorDescription,
 } from '../services/geminiService'
-import { explicitColorFromQuery, explicitStyleFromQuery } from '../services/attributeService'
+import { explicitColorFromQuery, explicitStyleFromQuery, STYLES } from '../services/attributeService'
+import type { Style } from '../services/attributeService'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -144,7 +145,11 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
       try {
         const wildEmbedding = await getTextEmbedding(description.wild.clipQuery)
         const seen = new Set(results.map((r) => r.id))
-        const { results: wildResults } = await searchSimilar(wildEmbedding, 8, description.wild.filters, seed)
+        // Odważna alternatywa ma być kontrastowa — nie ograniczaj jej stylem.
+        const wildFilters = description.wild.filters
+          ? { ...description.wild.filters, style: null }
+          : description.wild.filters
+        const { results: wildResults } = await searchSimilar(wildEmbedding, 8, wildFilters, seed)
         const unique = wildResults.filter((r) => !seen.has(r.id)).slice(0, 4)
         if (unique.length > 0) {
           wildcard = {
@@ -194,10 +199,15 @@ searchRouter.post('/search-text', async (req, res) => {
     }
 
     // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard z tekstu.
-    const bodyStyle = typeof req.body?.style === 'string' ? req.body.style : null
+    // body.style pochodzi z publicznego endpointu — waliduj wobec STYLES.
+    const rawStyle = req.body?.style
+    const bodyStyle =
+      typeof rawStyle === 'string' && (STYLES as readonly string[]).includes(rawStyle)
+        ? (rawStyle as Style)
+        : null
     const style = bodyStyle ?? explicitStyleFromQuery(query)
     if (style) {
-      description.filters = { ...description.filters, style: style as any }
+      description.filters = { ...description.filters, style }
       console.log(`[SEARCH-TEXT] Guard: wymuszono styl ${style}`)
     }
 
