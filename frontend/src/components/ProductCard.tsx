@@ -66,7 +66,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {variant && <p className="-mt-1.5 m-0 text-[13px] text-ink-soft">{variant}</p>}
       <div className="mt-auto flex items-baseline justify-between gap-2">
         <span className="font-display text-[16px] text-ink [font-variant-numeric:tabular-nums]">
-          {formatPrice(product.price)} zł{' '}
+          {formatPrice(product.priceFrom ?? product.price)} zł{' '}
           <small className="font-sans text-[10px] uppercase tracking-[0.05em] text-ink-soft">
             od
           </small>
@@ -77,6 +77,11 @@ export function ProductCard({ product }: ProductCardProps) {
           </span>
         )}
       </div>
+      {product.variantCount && product.variantCount > 1 && (
+        <p className="m-0 -mt-1 text-[11px] text-ink-soft/80">
+          {product.variantCount} warianty w konfiguratorze
+        </p>
+      )}
     </article>
   )
 

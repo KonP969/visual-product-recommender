@@ -8,6 +8,10 @@ export interface Product {
   description?: string
   /** Polskie uzasadnienie dopasowania — dociera osobnym eventem po wynikach */
   why?: string
+  /** cena najtańszego wariantu tej samej nazwy — gdy variantCount > 1 */
+  priceFrom?: string
+  /** liczba wariantów o tej samej nazwie (model+kolor) */
+  variantCount?: number
 }
 
 export interface Wildcard {
