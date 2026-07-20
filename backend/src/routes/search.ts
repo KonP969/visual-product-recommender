@@ -38,6 +38,8 @@ function toProducts(results: SearchResultItem[]) {
     description: r.metadata.description,
     colorFamily: r.metadata.color_family,
     hasGlass: r.metadata.has_glass,
+    variantCount: r.variantCount,
+    priceFrom: r.priceFrom,
   }))
 }
 

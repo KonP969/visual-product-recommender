@@ -48,6 +48,10 @@ export interface SearchResultItem {
   id: string
   similarity: number
   metadata: ProductMetadata
+  /** liczba wariantów o tej samej nazwie w puli (>=1) */
+  variantCount?: number
+  /** cena najtańszego wariantu w grupie (string, jak metadata.price) */
+  priceFrom?: string
 }
 
 // Patterns that identify non-residential specialty/commercial door types by product name.
@@ -139,7 +143,36 @@ export function applyMMR(
     remaining.splice(bestIdx, 1)
   }
 
-  return selected.map(({ id, similarity, metadata }) => ({ id, similarity, metadata }))
+  return selected.map(({ embedding, ...rest }) => rest)
+}
+
+// Warianty tego samego model+koloru (różne linie/ceny) mają w feedzie IDENTYCZNĄ
+// nazwę — w siatce wyglądają jak powtórki. Zwijamy je do jednego reprezentanta
+// (najlepiej dopasowanego), z ceną „od" (najtańszy w grupie) i licznikiem.
+// Dane w Chromie zostają — to tylko prezentacja. Wejście jest już posortowane
+// rankingiem, więc pierwsze wystąpienie nazwy = najlepszy wariant.
+export function dedupeByName<T extends SearchResultItem & { embedding: number[] }>(
+  candidates: T[],
+): Array<T & { variantCount: number; priceFrom: string }> {
+  const rep = new Map<string, T>()
+  const count = new Map<string, number>()
+  const minPrice = new Map<string, number>()
+  const minPriceStr = new Map<string, string>()
+  for (const c of candidates) {
+    const name = c.metadata.name
+    count.set(name, (count.get(name) ?? 0) + 1)
+    const p = Number(c.metadata.price)
+    if (!Number.isNaN(p) && p < (minPrice.get(name) ?? Infinity)) {
+      minPrice.set(name, p)
+      minPriceStr.set(name, c.metadata.price)
+    }
+    if (!rep.has(name)) rep.set(name, c)
+  }
+  return [...rep.values()].map((c) => ({
+    ...c,
+    variantCount: count.get(c.metadata.name)!,
+    priceFrom: minPriceStr.get(c.metadata.name) ?? c.metadata.price,
+  }))
 }
 
 interface CandidateItem extends SearchResultItem {
@@ -235,7 +268,8 @@ export async function searchSimilar(
   const topSimilarity = candidates[0]?.similarity ?? 0
 
   const ranked = seed ? applySeededJitter(candidates, seed) : candidates
-  const results = applyMMR(ranked, n)
+  const deduped = dedupeByName(ranked)
+  const results = applyMMR(deduped, n)
 
   return {
     results,

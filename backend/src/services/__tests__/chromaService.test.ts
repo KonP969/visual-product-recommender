@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { applyMMR, buildWhere, categorizeDoor, isDoorProduct, SearchResultItem } from '../chromaService'
+import {
+  applyMMR,
+  buildWhere,
+  categorizeDoor,
+  dedupeByName,
+  isDoorProduct,
+  SearchResultItem,
+} from '../chromaService'
 
 function candidate(
   id: string,
@@ -99,6 +106,85 @@ describe('applyMMR', () => {
   it('strips embeddings from returned items', () => {
     const results = applyMMR([candidate('a', 0.9, [1, 0])], 1)
     expect(results[0]).not.toHaveProperty('embedding')
+  })
+})
+
+describe('dedupeByName — zwijanie po nazwie', () => {
+  const item = (id: string, name: string, price: string, similarity: number) => ({
+    id,
+    similarity,
+    embedding: [1, 0],
+    metadata: { name, price, imageUrl: '' },
+  })
+
+  it('zwija identyczne nazwy do jednego (reprezentant = pierwszy)', () => {
+    const out = dedupeByName([
+      item('a', 'HIDE 1.1 - Biały', '798', 0.95),
+      item('b', 'HIDE 1.1 - Biały', '540', 0.94),
+      item('c', 'HIDE 1.1 - Biały', '1266', 0.93),
+    ])
+    expect(out).toHaveLength(1)
+    expect(out[0].id).toBe('a') // najlepiej dopasowany
+    expect(out[0].variantCount).toBe(3)
+    expect(out[0].priceFrom).toBe('540') // najtańszy w grupie
+  })
+
+  it('różne nazwy zostają wszystkie', () => {
+    const out = dedupeByName([
+      item('a', 'HIDE 1.1 - Biały', '798', 0.95),
+      item('b', 'AGAT R.2 - Dąb', '2220', 0.94),
+    ])
+    expect(out).toHaveLength(2)
+    expect(out.map((o) => o.variantCount)).toEqual([1, 1])
+  })
+
+  it('"bezprzylgowe" (inna nazwa) NIE zwija się z bazowym', () => {
+    const out = dedupeByName([
+      item('a', 'HIDE 1.1 - Biały', '798', 0.95),
+      item('b', 'HIDE 1.1 bezprzylgowe - Biały', '820', 0.94),
+    ])
+    expect(out).toHaveLength(2)
+  })
+
+  it('singleton: variantCount=1, priceFrom = własna cena', () => {
+    const out = dedupeByName([item('a', 'X - Y', '333', 0.9)])
+    expect(out[0].variantCount).toBe(1)
+    expect(out[0].priceFrom).toBe('333')
+  })
+
+  it('zachowuje kolejność rankingu (pierwsze wystąpienie nazwy)', () => {
+    const out = dedupeByName([
+      item('a', 'A - x', '10', 0.99),
+      item('b', 'B - y', '20', 0.98),
+      item('c', 'A - x', '5', 0.97),
+    ])
+    expect(out.map((o) => o.id)).toEqual(['a', 'b'])
+    expect(out[0].priceFrom).toBe('5') // min z grupy A mimo że rep to 'a'
+  })
+
+  it('cena niebędąca liczbą nie psuje min', () => {
+    const out = dedupeByName([
+      item('a', 'A - x', '—', 0.9),
+      item('b', 'A - x', '100', 0.89),
+    ])
+    expect(out[0].priceFrom).toBe('100')
+  })
+})
+
+describe('applyMMR — zachowuje variantCount/priceFrom', () => {
+  it('nowe pola przechodzą przez MMR', () => {
+    const c = {
+      id: 'a',
+      similarity: 0.9,
+      embedding: [1, 0],
+      metadata: { name: 'A', price: '10', imageUrl: '' },
+      variantCount: 3,
+      priceFrom: '5',
+    }
+    const [out] = applyMMR([c], 1)
+    expect(out.variantCount).toBe(3)
+    expect(out.priceFrom).toBe('5')
+    expect(out).not.toHaveProperty('embedding')
   })
 })
 
