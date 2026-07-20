@@ -134,7 +134,7 @@ export function Rail({
       )}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Doprecyzuj wyszukiwanie">
-        {CHIPY.map((chip) => {
+        {CHIPY.filter((c) => c.grupa !== 'styl').map((chip) => {
           const aktywny = czyAktywny(stan, chip.etykieta, chip.grupa)
           return (
             <button
@@ -153,6 +153,31 @@ export function Rail({
             </button>
           )
         })}
+      </div>
+
+      <div role="group" aria-label="Styl">
+        <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-ink-soft">Styl</p>
+        <div className="flex flex-wrap gap-2">
+          {CHIPY.filter((c) => c.grupa === 'styl').map((chip) => {
+            const aktywny = czyAktywny(stan, chip.etykieta, chip.grupa)
+            return (
+              <button
+                key={chip.etykieta}
+                type="button"
+                disabled={busy}
+                aria-pressed={aktywny}
+                onClick={() => onChip(chip.etykieta, chip.grupa)}
+                className={
+                  aktywny
+                    ? 'rounded-full border border-brass bg-brass px-3.5 py-1.5 text-[13px] font-medium text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
+                    : 'rounded-full border border-linen bg-white px-3.5 py-1.5 text-[13px] text-ink transition-colors hover:border-brass hover:bg-brass-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
+                }
+              >
+                {chip.etykieta}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2">

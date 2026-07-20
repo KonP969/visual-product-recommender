@@ -29,7 +29,30 @@ export const CHIPY: DefChipa[] = [
   { etykieta: 'bez przeszklenia', grupa: 'szkło' },
   { etykieta: 'drewno naturalne', grupa: 'materiał' },
   { etykieta: 'klasyczne', grupa: 'styl' },
+  { etykieta: 'nowoczesne', grupa: 'styl' },
+  { etykieta: 'minimalistyczne', grupa: 'styl' },
+  { etykieta: 'rustykalne', grupa: 'styl' },
+  { etykieta: 'loftowe', grupa: 'styl' },
+  { etykieta: 'skandynawskie', grupa: 'styl' },
+  { etykieta: 'glamour', grupa: 'styl' },
 ]
+
+// Etykieta chipa (PL, przymiotnik) → enum stylu backendu (rzeczownik).
+export const STYLE_LABELS: Record<string, string> = {
+  klasyczne: 'klasyczny',
+  nowoczesne: 'nowoczesny',
+  minimalistyczne: 'minimalistyczny',
+  rustykalne: 'rustykalny',
+  loftowe: 'loft',
+  skandynawskie: 'skandynawski',
+  glamour: 'glamour',
+}
+
+// Aktywny styl (jeśli jest krok grupy 'styl') → enum backendu do wysłania wprost.
+export function aktywnyStyl(stan: StanZapytania): string | null {
+  const krok = stan.kroki.find((k) => k.grupa === 'styl')
+  return krok ? (STYLE_LABELS[krok.etykieta] ?? null) : null
+}
 
 // "ale" tylko dla korekt względnych (jasność) — "dąb, ale jaśniejsze".
 // Reszta to dopowiedzenia: przecinek. "dąb, ale klasyczne" fałszywie sugerowało

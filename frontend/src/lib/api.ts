@@ -81,13 +81,14 @@ export async function searchByImage(
 
 export async function searchByText(
   query: string,
+  opts: { style?: string | null } = {},
   handlers: SearchStreamHandlers = {},
 ): Promise<ApiResponse<SearchResult>> {
   try {
     const response = await fetch(`${BASE_URL}/search-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, style: opts.style ?? null }),
     })
     return await consumeSearchStream(response, handlers)
   } catch {

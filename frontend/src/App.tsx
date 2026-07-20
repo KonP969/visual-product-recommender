@@ -33,10 +33,22 @@ export default function App() {
     if (pl) ustawBazę(pl)
   }, [searchResult, ustawBazę])
 
-  const handleChip = (etykieta: string, grupa: Grupa) => refine(refinement.chip(etykieta, grupa))
-  const handleText = (text: string) => refine(refinement.tekst(text))
-  const handleRemove = (index: number) => refine(refinement.usuń(index))
-  const handleUndo = () => refine(refinement.cofnijKrok())
+  const handleChip = (etykieta: string, grupa: Grupa) => {
+    const q = refinement.chip(etykieta, grupa)
+    refine(q, refinement.stylTeraz())
+  }
+  const handleText = (text: string) => {
+    const q = refinement.tekst(text)
+    refine(q, refinement.stylTeraz())
+  }
+  const handleRemove = (index: number) => {
+    const q = refinement.usuń(index)
+    refine(q, refinement.stylTeraz())
+  }
+  const handleUndo = () => {
+    const q = refinement.cofnijKrok()
+    refine(q, refinement.stylTeraz())
+  }
 
   const handleReset = () => {
     refinement.zeruj()

@@ -6,6 +6,7 @@ import {
   usuńKrok,
   cofnij,
   budujZapytanie,
+  aktywnyStyl,
 } from '@/lib/refinement'
 
 export interface UseRefinementReturn {
@@ -16,6 +17,7 @@ export interface UseRefinementReturn {
   usuń: (index: number) => string
   cofnijKrok: () => string
   zeruj: () => void
+  stylTeraz: () => string | null
 }
 
 // Cienka nakładka na czysty moduł refinement. Ref lustrzy najświeższy stan,
@@ -55,5 +57,7 @@ export function useRefinement(): UseRefinementReturn {
     setStan(next)
   }, [])
 
-  return { stan, ustawBazę, chip, tekst, usuń, cofnijKrok, zeruj }
+  const stylTeraz = useCallback(() => aktywnyStyl(ref.current), [])
+
+  return { stan, ustawBazę, chip, tekst, usuń, cofnijKrok, zeruj, stylTeraz }
 }

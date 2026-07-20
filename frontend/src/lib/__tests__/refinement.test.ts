@@ -8,6 +8,7 @@ import {
   budujZapytanie,
   czyAktywny,
   CHIPY,
+  aktywnyStyl,
 } from '../refinement'
 
 const baza = (b: string | null = 'dębowe drzwi') => stanPoczątkowy(b)
@@ -16,7 +17,8 @@ describe('CHIPY — definicje', () => {
   it('mają dokładnie dzisiejsze etykiety i poprawne grupy', () => {
     expect(CHIPY.map((c) => c.etykieta)).toEqual([
       'jaśniejsze', 'ciemniejsze', 'ze szkłem', 'bez przeszklenia',
-      'drewno naturalne', 'klasyczne',
+      'drewno naturalne', 'klasyczne', 'nowoczesne', 'minimalistyczne',
+      'rustykalne', 'loftowe', 'skandynawskie', 'glamour',
     ])
     expect(CHIPY.find((c) => c.etykieta === 'jaśniejsze')?.grupa).toBe('jasność')
     expect(CHIPY.find((c) => c.etykieta === 'klasyczne')?.grupa).toBe('styl')
@@ -142,5 +144,23 @@ describe('czyAktywny', () => {
     const s = dodajKrok(baza(), 'klasyczne', 'styl')
     expect(czyAktywny(s, 'klasyczne', 'styl')).toBe(true)
     expect(czyAktywny(s, 'ze szkłem', 'szkło')).toBe(false)
+  })
+})
+
+describe('chipy stylu', () => {
+  it('CHIPY ma 7 stylów w grupie styl', () => {
+    const style = CHIPY.filter((c) => c.grupa === 'styl').map((c) => c.etykieta)
+    expect(style).toEqual([
+      'klasyczne', 'nowoczesne', 'minimalistyczne', 'rustykalne', 'loftowe', 'skandynawskie', 'glamour',
+    ])
+  })
+  it('aktywnyStyl mapuje etykietę na enum backendu', () => {
+    let s = dodajKrok(stanPoczątkowy('drzwi'), 'loftowe', 'styl')
+    expect(aktywnyStyl(s)).toBe('loft')
+    s = dodajKrok(stanPoczątkowy('drzwi'), 'klasyczne', 'styl')
+    expect(aktywnyStyl(s)).toBe('klasyczny')
+  })
+  it('aktywnyStyl null gdy brak kroku stylu', () => {
+    expect(aktywnyStyl(stanPoczątkowy('drzwi'))).toBeNull()
   })
 })
