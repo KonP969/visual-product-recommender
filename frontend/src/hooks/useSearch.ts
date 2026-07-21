@@ -10,7 +10,7 @@ interface UseSearchReturn {
   searchResult: SearchResult | null
   errorMessage: string | null
   search: (file: File) => Promise<void>
-  refine: (query: string, style?: string | null) => Promise<void>
+  refine: (query: string, style?: string | null, refinement?: string) => Promise<void>
   reset: () => void
 }
 
@@ -76,13 +76,13 @@ export function useSearch(): UseSearchReturn {
   )
 
   const refine = useCallback(
-    async (query: string, style?: string | null) => {
+    async (query: string, style?: string | null, refinement?: string) => {
       setAppState('loading')
       setSearchStage('analyzing')
       setErrorMessage(null)
 
       const { searchByText } = await import('@/lib/api')
-      const response = await searchByText(query, { style: style ?? null }, {
+      const response = await searchByText(query, { style: style ?? null, refinement }, {
         onStage: setSearchStage,
         onResult: applyResult,
         onReasons: mergeReasons,

@@ -194,7 +194,13 @@ searchRouter.post('/search-text', async (req, res) => {
 
     // Deterministyczny guard: jawnie nazwany pojedynczy kolor przebija LLM,
     // który bywa zbyt liberalny (np. "czarne" → dorzuca dark_wood).
-    const explicitColors = explicitColorFromQuery(query)
+    // Guard bada TYLKO słowa użytkownika (chip/wpis), nie zamrożoną bazę: baza to
+    // parafraza wnętrza ("jasne drzwi dębowe...") i jej "jasne" fałszywie łapało
+    // RELATIVE_OR_VAGUE_RE, kasując dopisany przez usera kolor ("drzwi czarne").
+    const rawRefinement = req.body?.refinement
+    const guardText =
+      typeof rawRefinement === 'string' && rawRefinement.trim() ? rawRefinement : query
+    const explicitColors = explicitColorFromQuery(guardText)
     if (explicitColors) {
       description.filters = { ...description.filters, colors: explicitColors }
       console.log(`[SEARCH-TEXT] Guard: wymuszono kolor ${JSON.stringify(explicitColors)}`)

@@ -35,19 +35,19 @@ export default function App() {
 
   const handleChip = (etykieta: string, grupa: Grupa) => {
     const q = refinement.chip(etykieta, grupa)
-    refine(q, refinement.stylTeraz())
+    refine(q, refinement.stylTeraz(), refinement.słowaTeraz())
   }
   const handleText = (text: string) => {
     const q = refinement.tekst(text)
-    refine(q, refinement.stylTeraz())
+    refine(q, refinement.stylTeraz(), refinement.słowaTeraz())
   }
   const handleRemove = (index: number) => {
     const q = refinement.usuń(index)
-    refine(q, refinement.stylTeraz())
+    refine(q, refinement.stylTeraz(), refinement.słowaTeraz())
   }
   const handleUndo = () => {
     const q = refinement.cofnijKrok()
-    refine(q, refinement.stylTeraz())
+    refine(q, refinement.stylTeraz(), refinement.słowaTeraz())
   }
 
   const handleReset = () => {

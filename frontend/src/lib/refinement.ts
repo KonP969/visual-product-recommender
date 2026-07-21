@@ -98,6 +98,14 @@ export function wyczyść(stan: StanZapytania): StanZapytania {
   return { ...stan, kroki: [] }
 }
 
+// Same słowa użytkownika (kroki), BEZ zamrożonej bazy. Baza to parafraza maszyny
+// z opisem wnętrza ("jasne drzwi dębowe...") — jej przymiotniki względne/mgliste
+// nie mogą wyłączać guardu koloru dla tego, co user dopisał ("drzwi czarne").
+// Backend odpala na tym polu explicitColorFromQuery; puste → fallback do query.
+export function słowaUżytkownika(stan: StanZapytania): string {
+  return stan.kroki.map((k) => k.etykieta).join(', ')
+}
+
 export function budujZapytanie(stan: StanZapytania): string {
   const baza = stan.baza ?? ''
   const złożone = stan.kroki.reduce(

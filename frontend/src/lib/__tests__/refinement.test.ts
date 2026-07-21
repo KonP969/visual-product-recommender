@@ -9,6 +9,7 @@ import {
   czyAktywny,
   CHIPY,
   aktywnyStyl,
+  słowaUżytkownika,
 } from '../refinement'
 
 const baza = (b: string | null = 'dębowe drzwi') => stanPoczątkowy(b)
@@ -136,6 +137,24 @@ describe('baza zamrożona — test na dryf (najważniejszy)', () => {
     s = dodajKrok(s, 'bez przeszklenia', 'szkło')
     s = dodajKrok(s, 'jaśniejsze', 'jasność')
     expect(s.baza).toBe('dębowe drzwi w ciepłym wnętrzu')
+  })
+})
+
+describe('słowaUżytkownika — intencja z kroków, bez bazy', () => {
+  it('pusto, gdy brak kroków (sama baza z parafrazy maszyny)', () => {
+    // Sedno buga A: baza "jasne drzwi dębowe..." NIE może wejść do guardu koloru.
+    expect(słowaUżytkownika(baza('jasne drzwi dębowe, nowoczesne'))).toBe('')
+  })
+
+  it('zwraca słowa dopisane przez użytkownika, pomijając bazę', () => {
+    const s = dodajKrok(baza('jasne drzwi dębowe, nowoczesne'), 'drzwi czarne', 'własne')
+    expect(słowaUżytkownika(s)).toBe('drzwi czarne')
+  })
+
+  it('skleja wiele kroków w kolejności', () => {
+    let s = dodajKrok(baza('jasne drzwi dębowe'), 'bez przeszklenia', 'szkło')
+    s = dodajKrok(s, 'drzwi czarne', 'własne')
+    expect(słowaUżytkownika(s)).toBe('bez przeszklenia, drzwi czarne')
   })
 })
 
