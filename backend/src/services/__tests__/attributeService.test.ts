@@ -10,7 +10,9 @@ import {
   styleFlags,
   explicitStyleFromQuery,
   STYLES,
+  aggregateStyles,
 } from '../attributeService'
+import type { Style } from '../attributeService'
 import { buildWhere, applySeededJitter } from '../chromaService'
 import { parseDoorDescription } from '../geminiService'
 
@@ -331,5 +333,52 @@ describe('reasonConflictsWithColor — guard uzasadnień', () => {
 
   it('brak wariantu w nazwie → brak porównania', () => {
     expect(reasonConflictsWithColor('grafitowy odcień.', 'PORTA BEZ WARIANTU')).toBe(false)
+  })
+})
+
+describe('aggregateStyles — głosy wariantów → style modelu', () => {
+  it('większość głosów wygrywa', () => {
+    expect(aggregateStyles([['nowoczesny'], ['nowoczesny'], ['klasyczny']])).toEqual(['nowoczesny'])
+  })
+
+  it('multi-label: każdy styl z większością przechodzi', () => {
+    expect(
+      aggregateStyles([
+        ['nowoczesny', 'minimalistyczny'],
+        ['nowoczesny', 'minimalistyczny'],
+        ['nowoczesny'],
+      ]),
+    ).toEqual(['nowoczesny', 'minimalistyczny'])
+  })
+
+  it('brak większości → styl z największą liczbą głosów', () => {
+    // klasyczny 2/4 to NIE większość (>50%), ale jest liderem
+    expect(
+      aggregateStyles([['klasyczny'], ['nowoczesny'], ['glamour'], ['klasyczny']]),
+    ).toEqual(['klasyczny'])
+  })
+
+  it('remis liderów → wszyscy liderzy', () => {
+    expect(aggregateStyles([['klasyczny'], ['nowoczesny']])).toEqual(['klasyczny', 'nowoczesny'])
+  })
+
+  it('pojedynczy wariant dyktuje styl modelu', () => {
+    expect(aggregateStyles([['rustykalny']])).toEqual(['rustykalny'])
+  })
+
+  it('żaden wariant nie ma stylu → pusto (style_none)', () => {
+    expect(aggregateStyles([[], [], []])).toEqual([])
+  })
+
+  it('brak wariantów → pusto', () => {
+    expect(aggregateStyles([])).toEqual([])
+  })
+
+  it('szum jednego wariantu nie robi modelu rustykalnym', () => {
+    // PORTA FIT model H.2: 19 wariantów, jeden opis ma "rustic touch"
+    const głosy: Style[][] = Array.from({ length: 19 }, (_, i) =>
+      i === 5 ? ['nowoczesny' as Style, 'rustykalny' as Style] : ['nowoczesny' as Style],
+    )
+    expect(aggregateStyles(głosy)).toEqual(['nowoczesny'])
   })
 })

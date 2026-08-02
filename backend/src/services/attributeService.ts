@@ -76,6 +76,28 @@ export function styleFlags(styles: Style[]): Record<string, boolean> {
   return flags
 }
 
+// Styl to cecha MODELU, nie wariantu koloru: opisy wariantów tego samego modelu
+// bywają sprzeczne ("modern" vs "modern, adding a rustic touch"), bo styl przykleja
+// się do wybarwienia. Głosujemy: styl z większością głosów wygrywa. Gdy nikt nie ma
+// większości, bierzemy lidera — dzięki temu model nie wpada do style_none, którego
+// filtr nigdy nie chowa (a więc pokazywałby się pod KAŻDYM chipem stylu).
+export function aggregateStyles(perVariant: Style[][]): Style[] {
+  if (perVariant.length === 0) return []
+  const głosy = new Map<Style, number>()
+  for (const style of perVariant) {
+    for (const s of style) głosy.set(s, (głosy.get(s) ?? 0) + 1)
+  }
+  if (głosy.size === 0) return []
+
+  // Iterujemy po STYLES, żeby kolejność wyniku była kanoniczna (stabilne testy
+  // i stabilne metadane), niezależna od kolejności wstawiania do mapy.
+  const większość = STYLES.filter((s) => (głosy.get(s) ?? 0) * 2 > perVariant.length)
+  if (większość.length > 0) return [...większość]
+
+  const max = Math.max(...głosy.values())
+  return STYLES.filter((s) => (głosy.get(s) ?? 0) === max)
+}
+
 // Jawnie nazwany POJEDYNCZY styl w tekście → enum. Zero lub wiele → null
 // (wtedy ufamy LLM-owi). Bliźniak explicitColorFromQuery.
 const EXPLICIT_STYLE_TERMS: Array<[RegExp, Style]> = [
