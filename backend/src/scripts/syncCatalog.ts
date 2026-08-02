@@ -13,6 +13,7 @@ import { getTextEmbedding } from '../services/clipService'
 import { classifyDoor, styleFlags } from '../services/attributeService'
 import { categorizeDoor, isDoorProduct } from '../services/chromaService'
 import { resolveGlassForProducts } from '../services/glassResolver'
+import { resolveStylesForProducts } from '../services/styleResolver'
 
 const FEED_URL = process.env.FEED_URL ?? 'https://www.porta.com.pl/product-feed.xml'
 const BATCH = 50
@@ -141,6 +142,13 @@ async function main() {
       console.log(`[SYNC] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
     } catch (err) {
       console.warn('[SYNC] Wizyjne szkło padło (pomijam):', err instanceof Error ? err.message : err)
+    }
+
+    try {
+      const style = await resolveStylesForProducts(dodane)
+      console.log(`[SYNC] Styl: ${style.updated} rekordów w ${style.models} modelach`)
+    } catch (err) {
+      console.warn('[SYNC] Styl per model padł (pomijam):', err instanceof Error ? err.message : err)
     }
   }
 

@@ -4,6 +4,7 @@ import { getEmbedding } from './clipService'
 import { upsertProduct, productExists, categorizeDoor, isDoorProduct } from './chromaService'
 import { classifyDoor, styleFlags } from './attributeService'
 import { resolveGlassForProducts } from './glassResolver'
+import { resolveStylesForProducts } from './styleResolver'
 
 export interface ImportProgress {
   current: number
@@ -108,6 +109,13 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
       console.log(`[IMPORT] Szkło: ${glass.flips} korekt, ${glass.visionCalls} wizji, ${glass.failed} nierozstrzygniętych`)
     } catch (err) {
       console.warn('[IMPORT] Wizyjne szkło padło (pomijam):', err instanceof Error ? err.message : err)
+    }
+
+    try {
+      const style = await resolveStylesForProducts(dodane)
+      console.log(`[IMPORT] Styl: ${style.updated} rekordów w ${style.models} modelach`)
+    } catch (err) {
+      console.warn('[IMPORT] Styl per model padł (pomijam):', err instanceof Error ? err.message : err)
     }
   }
 
