@@ -17,6 +17,8 @@ import {
   STYLES,
 } from '../services/attributeService'
 import type { Style } from '../services/attributeService'
+import { countStyles } from '../services/styleIndex'
+import { buildNotice } from './searchNotices'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -49,29 +51,15 @@ function toProducts(results: SearchResultItem[]) {
   }))
 }
 
-// Klucz techniczny wybarwienia → nazwa, którą klient sam by wypowiedział.
-const FINISH_PL: Record<string, string> = {
-  orzech: 'orzech',
-  dab: 'dąb',
-  jesion: 'jesion',
-  akacja: 'akacja',
-  sosna: 'sosna',
-  buk: 'buk',
-  wenge: 'wenge',
-  hikora: 'hikora',
-}
-
 function buildResultPayload(
   description: DoorDescription | null,
   results: SearchResultItem[],
   isLowSimilarity: boolean,
   droppedFinish?: string,
+  droppedStyle?: Style,
+  styleCounts?: Record<Style, number>,
 ) {
-  // Gdy pominęliśmy filtr, mówimy o tym wprost — cicha podmiana kryteriów
-  // wygląda jak awaria wyszukiwarki i kosztuje zaufanie.
-  const notice = droppedFinish
-    ? `Nie mamy drzwi w wybarwieniu „${FINISH_PL[droppedFinish] ?? droppedFinish}” przy pozostałych kryteriach — pokazujemy zbliżone kolorystycznie.`
-    : undefined
+  const notice = buildNotice(droppedFinish, droppedStyle)
   if (results.length === 0) {
     return {
       products: [],
@@ -79,6 +67,7 @@ function buildResultPayload(
       displayDescription: description?.displayPl,
       status: 'empty-catalog' as const,
       notice,
+      styleCounts,
     }
   }
   return {
@@ -87,6 +76,7 @@ function buildResultPayload(
     displayDescription: description?.displayPl,
     status: isLowSimilarity ? ('low-similarity' as const) : ('success' as const),
     notice,
+    styleCounts,
   }
 }
 
@@ -161,10 +151,29 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     // Seed z hasha zdjęcia: dwa podobne wnętrza tasują remisy inaczej,
     // a to samo zdjęcie zawsze dostaje te same wyniki.
     const seed = createHash('sha256').update(req.file.buffer).digest('hex')
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description?.filters, seed)
+
+    // Liczniki chipów liczymy zawsze — front wygasza style bez trafień, zanim
+    // użytkownik w nie kliknie. Filtr stylu wykluczony: liczymy przekrój, w
+    // którym chip dopiero ma być kliknięty.
+    const styleCounts = await countStyles({ ...description?.filters, style: null })
+    let filters = description?.filters
+    let droppedStyle: Style | undefined
+    if (filters?.style && styleCounts[filters.style] === 0) {
+      droppedStyle = filters.style
+      filters = { ...filters, style: null }
+      console.warn(`[SEARCH] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
+    }
+    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, filters, seed)
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 
-    const payload = buildResultPayload(description, results, isLowSimilarity)
+    const payload = buildResultPayload(
+      description,
+      results,
+      isLowSimilarity,
+      undefined,
+      droppedStyle,
+      styleCounts,
+    )
 
     // Odważna alternatywa projektanta: przychodzi w TYM SAMYM wywołaniu Gemini,
     // więc kosztuje tylko jeden embedding (sidecar) i jedno query do Chroma.
@@ -266,16 +275,35 @@ searchRouter.post('/search-text', async (req, res) => {
     const embedding = await getTextEmbedding(description.clipQuery)
     console.log(`[SEARCH-TEXT] Filters: ${JSON.stringify(description.filters)}`)
     const seed = createHash('sha256').update(query).digest('hex')
+
+    const styleCounts = await countStyles({ ...description.filters, style: null })
+    let filters = description.filters
+    let droppedStyle: Style | undefined
+    if (filters?.style && styleCounts[filters.style] === 0) {
+      // Bez tego $or [styl, style_none] degeneruje do garstki drzwi bezstylowych,
+      // które ze stylem nie mają nic wspólnego (zgłoszenie: „pokazuje stalowe").
+      droppedStyle = filters.style
+      filters = { ...filters, style: null }
+      console.warn(`[SEARCH-TEXT] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
+    }
+
     const { results, isLowSimilarity, droppedFinish } = await searchSimilar(
       embedding,
       10,
-      description.filters,
+      filters,
       seed,
     )
 
     send({
       type: 'result',
-      data: buildResultPayload(description, results, isLowSimilarity, droppedFinish),
+      data: buildResultPayload(
+        description,
+        results,
+        isLowSimilarity,
+        droppedFinish,
+        droppedStyle,
+        styleCounts,
+      ),
     })
     await sendMatchReasons(send, description, results)
   } catch (err) {
