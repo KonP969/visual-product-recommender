@@ -1,46 +1,69 @@
-// Nadaje flagi style_* wszystkim residential z ich OPISU (już w metadanych).
-// Metadane-only: bez embeddingu, bez Gemini, bez wizji — jeden przelot.
+// Nadaje flagi style_* wszystkim residential — jedna decyzja NA MODEL, propagowana
+// na warianty kolorystyczne. Metadane-only: bez embeddingu, bez Gemini, bez wizji.
 // Uruchomienie: cd backend && npx ts-node --transpile-only src/scripts/backfillStyle.ts
 import 'dotenv/config'
 import { ChromaClient } from 'chromadb'
-import { classifyStyles, styleFlags } from '../services/attributeService'
+import { aggregateStyles, classifyStyles, styleFlags } from '../services/attributeService'
+import { modelOf } from '../services/glassResolver'
 import { categorizeDoor } from '../services/chromaService'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
+
+interface Rekord {
+  id: string
+  meta: Record<string, unknown>
+}
 
 async function main() {
   const client = new ChromaClient({ path: CHROMA_URL })
   const col = await client.getCollection({ name: 'products' })
 
-  const ids: string[] = []
-  const metas: Record<string, unknown>[] = []
-  const byStyle: Record<string, number> = {}
+  // 1. Wczytaj cały katalog i zgrupuj residential po modelu.
+  const byModel = new Map<string, Rekord[]>()
   let scanned = 0
   let offset = 0
   while (true) {
     const r = await col.get({ limit: 500, offset, include: ['metadatas'] as any })
     if (r.ids.length === 0) break
     r.ids.forEach((id: string, i: number) => {
-      const m = (r.metadatas[i] ?? {}) as Record<string, unknown>
+      const meta = (r.metadatas[i] ?? {}) as Record<string, unknown>
       scanned++
-      if (categorizeDoor(String(m.name ?? '')) !== 'residential') return
-      const styles = classifyStyles(String(m.description ?? ''))
-      const flags = styleFlags(styles)
-      ids.push(id)
-      metas.push({ ...m, ...flags })
-      const key = styles.length ? styles.join('+') : '(none)'
-      byStyle[key] = (byStyle[key] ?? 0) + 1
+      const name = String(meta.name ?? '')
+      if (categorizeDoor(name) !== 'residential') return
+      const model = modelOf(name)
+      if (!byModel.has(model)) byModel.set(model, [])
+      byModel.get(model)!.push({ id, meta })
     })
     offset += r.ids.length
     if (r.ids.length < 500) break
   }
-  console.log(`[STYLE] Przeskanowano ${scanned}, do aktualizacji ${ids.length}`)
+  console.log(`[STYLE] Przeskanowano ${scanned}, residential w ${byModel.size} modelach`)
+
+  // 2. Głosowanie per model → identyczne flagi dla wszystkich wariantów.
+  const ids: string[] = []
+  const metas: Record<string, unknown>[] = []
+  const byStyle: Record<string, number> = {}
+  for (const [, warianty] of byModel) {
+    const style = aggregateStyles(warianty.map((w) => classifyStyles(String(w.meta.description ?? ''))))
+    const flags = styleFlags(style)
+    const key = style.length ? style.join('+') : '(none)'
+    byStyle[key] = (byStyle[key] ?? 0) + warianty.length
+    for (const w of warianty) {
+      // Aktualizujemy tylko rekordy, którym flagi się zmieniają — mniej zapisu.
+      const różni = Object.entries(flags).some(([k, v]) => w.meta[k] !== v)
+      if (!różni) continue
+      ids.push(w.id)
+      metas.push({ ...w.meta, ...flags })
+    }
+  }
+  console.log(`[STYLE] Do aktualizacji ${ids.length} rekordów`)
+
   for (let i = 0; i < ids.length; i += 200) {
     await col.update({ ids: ids.slice(i, i + 200), metadatas: metas.slice(i, i + 200) as any })
     console.log(`[STYLE] zaktualizowano ${Math.min(i + 200, ids.length)}/${ids.length}`)
   }
-  // Raport: rozkład kombinacji stylów
-  console.log('[STYLE] Rozkład (kombinacja → liczba):')
+
+  console.log('[STYLE] Rozkład (kombinacja → warianty):')
   for (const [k, n] of Object.entries(byStyle).sort((a, b) => b[1] - a[1]).slice(0, 12)) {
     console.log(`  ${String(n).padStart(5)}  ${k}`)
   }
