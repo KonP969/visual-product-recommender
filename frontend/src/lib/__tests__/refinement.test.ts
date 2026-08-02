@@ -10,7 +10,10 @@ import {
   CHIPY,
   aktywnyStyl,
   słowaUżytkownika,
+  liczbaChipa,
+  chipWygaszony,
 } from '../refinement'
+import type { StanZapytania } from '../refinement'
 
 const baza = (b: string | null = 'dębowe drzwi') => stanPoczątkowy(b)
 
@@ -181,5 +184,45 @@ describe('chipy stylu', () => {
   })
   it('aktywnyStyl null gdy brak kroku stylu', () => {
     expect(aktywnyStyl(stanPoczątkowy('drzwi'))).toBeNull()
+  })
+})
+
+describe('liczbaChipa', () => {
+  it('zwraca liczbę dla chipa stylu', () => {
+    expect(liczbaChipa('rustykalne', { rustykalny: 0, klasyczny: 138 })).toBe(0)
+    expect(liczbaChipa('klasyczne', { rustykalny: 0, klasyczny: 138 })).toBe(138)
+  })
+
+  it('brak liczników → undefined (chipy jak dotąd)', () => {
+    expect(liczbaChipa('rustykalne', undefined)).toBeUndefined()
+  })
+
+  it('chip spoza grupy styl nie ma liczby', () => {
+    expect(liczbaChipa('ze szkłem', { rustykalny: 0 })).toBeUndefined()
+  })
+})
+
+describe('chipWygaszony', () => {
+  const pusty: StanZapytania = { baza: 'białe drzwi', kroki: [] }
+
+  it('zero trafień → wygaszony', () => {
+    expect(chipWygaszony('rustykalne', 'styl', pusty, { rustykalny: 0 })).toBe(true)
+  })
+
+  it('są trafienia → aktywny', () => {
+    expect(chipWygaszony('klasyczne', 'styl', pusty, { klasyczny: 138 })).toBe(false)
+  })
+
+  it('aktywny chip nigdy nie jest wygaszony — musi dać się odkliknąć', () => {
+    const zeStylem = dodajKrok(pusty, 'rustykalne', 'styl')
+    expect(chipWygaszony('rustykalne', 'styl', zeStylem, { rustykalny: 0 })).toBe(false)
+  })
+
+  it('brak liczników → nic nie wygaszamy', () => {
+    expect(chipWygaszony('rustykalne', 'styl', pusty, undefined)).toBe(false)
+  })
+
+  it('chipy spoza grupy styl nigdy nie są wygaszane', () => {
+    expect(chipWygaszony('ze szkłem', 'szkło', pusty, { rustykalny: 0 })).toBe(false)
   })
 })

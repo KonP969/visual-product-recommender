@@ -29,6 +29,8 @@ export interface SearchResult {
   status: 'success' | 'empty-catalog' | 'low-similarity'
   /** Kryterium, którego nie dało się spełnić — mówimy o tym wprost, nie po cichu */
   notice?: string
+  /** trafienia per styl przy obecnych filtrach — do liczb i wygaszania chipów */
+  styleCounts?: Record<string, number>
 }
 
 export interface ApiResponse<T> {

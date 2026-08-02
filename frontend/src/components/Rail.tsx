@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import { X, Undo2 } from 'lucide-react'
 import type { FileValidationError } from '@/types'
-import { CHIPY, czyAktywny } from '@/lib/refinement'
+import { CHIPY, czyAktywny, liczbaChipa, chipWygaszony } from '@/lib/refinement'
 import type { Krok, Grupa, StanZapytania } from '@/lib/refinement'
 
 interface RailProps {
@@ -17,6 +17,39 @@ interface RailProps {
   onRemove: (index: number) => void
   onUndo: () => void
   onReset: () => void
+  styleCounts?: Record<string, number>
+}
+
+interface ChipButtonProps {
+  etykieta: string
+  aktywny: boolean
+  disabled: boolean
+  count?: number
+  brakTrafien: boolean
+  onClick: () => void
+}
+
+// Jeden chip — wspólny dla rzędu jasność/szkło/materiał i dla rzędu stylu.
+function ChipButton({ etykieta, aktywny, disabled, count, brakTrafien, onClick }: ChipButtonProps) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={aktywny}
+      title={brakTrafien ? 'brak przy obecnych filtrach' : undefined}
+      onClick={onClick}
+      className={
+        aktywny
+          ? 'rounded-full border border-brass bg-brass px-3.5 py-1.5 text-[13px] font-medium text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
+          : 'rounded-full border border-linen bg-white px-3.5 py-1.5 text-[13px] text-ink transition-colors hover:border-brass hover:bg-brass-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
+      }
+    >
+      {etykieta}
+      {count !== undefined && (
+        <span className={aktywny ? 'ml-1.5 text-paper/70' : 'ml-1.5 text-ink-soft'}>{count}</span>
+      )}
+    </button>
+  )
 }
 
 export function Rail({
@@ -31,6 +64,7 @@ export function Rail({
   onRemove,
   onUndo,
   onReset,
+  styleCounts,
 }: RailProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [tekst, setTekst] = useState('')
@@ -136,47 +170,33 @@ export function Rail({
       )}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Doprecyzuj wyszukiwanie">
-        {CHIPY.filter((c) => c.grupa !== 'styl').map((chip) => {
-          const aktywny = czyAktywny(stan, chip.etykieta, chip.grupa)
-          return (
-            <button
-              key={chip.etykieta}
-              type="button"
-              disabled={busy}
-              aria-pressed={aktywny}
-              onClick={() => onChip(chip.etykieta, chip.grupa)}
-              className={
-                aktywny
-                  ? 'rounded-full border border-brass bg-brass px-3.5 py-1.5 text-[13px] font-medium text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
-                  : 'rounded-full border border-linen bg-white px-3.5 py-1.5 text-[13px] text-ink transition-colors hover:border-brass hover:bg-brass-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
-              }
-            >
-              {chip.etykieta}
-            </button>
-          )
-        })}
+        {CHIPY.filter((c) => c.grupa !== 'styl').map((chip) => (
+          <ChipButton
+            key={chip.etykieta}
+            etykieta={chip.etykieta}
+            aktywny={czyAktywny(stan, chip.etykieta, chip.grupa)}
+            disabled={busy}
+            brakTrafien={false}
+            onClick={() => onChip(chip.etykieta, chip.grupa)}
+          />
+        ))}
       </div>
 
       <div role="group" aria-label="Styl">
         <p className="mb-2 text-[11px] uppercase tracking-[0.12em] text-ink-soft">Styl</p>
         <div className="flex flex-wrap gap-2">
           {CHIPY.filter((c) => c.grupa === 'styl').map((chip) => {
-            const aktywny = czyAktywny(stan, chip.etykieta, chip.grupa)
+            const wygaszony = chipWygaszony(chip.etykieta, chip.grupa, stan, styleCounts)
             return (
-              <button
+              <ChipButton
                 key={chip.etykieta}
-                type="button"
-                disabled={busy}
-                aria-pressed={aktywny}
+                etykieta={chip.etykieta}
+                aktywny={czyAktywny(stan, chip.etykieta, chip.grupa)}
+                disabled={busy || wygaszony}
+                count={liczbaChipa(chip.etykieta, styleCounts)}
+                brakTrafien={wygaszony}
                 onClick={() => onChip(chip.etykieta, chip.grupa)}
-                className={
-                  aktywny
-                    ? 'rounded-full border border-brass bg-brass px-3.5 py-1.5 text-[13px] font-medium text-paper transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
-                    : 'rounded-full border border-linen bg-white px-3.5 py-1.5 text-[13px] text-ink transition-colors hover:border-brass hover:bg-brass-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brass disabled:opacity-40'
-                }
-              >
-                {chip.etykieta}
-              </button>
+              />
             )
           })}
         </div>

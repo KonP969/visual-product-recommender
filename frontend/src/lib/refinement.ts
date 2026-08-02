@@ -116,3 +116,27 @@ export function budujZapytanie(stan: StanZapytania): string {
   // pierwszy krok — ale nie chcemy zapytania zaczynającego się od ", ").
   return złożone.replace(/^,\s*/, '')
 }
+
+// Liczba trafień dla chipa stylu (backend liczy przekrój bez filtra stylu).
+// Chipy spoza grupy „styl" liczników nie mają — świadomie, zakres decyzji.
+export function liczbaChipa(
+  etykieta: string,
+  counts?: Record<string, number>,
+): number | undefined {
+  if (!counts) return undefined
+  const enumStylu = STYLE_LABELS[etykieta]
+  return enumStylu ? counts[enumStylu] : undefined
+}
+
+// Chip bez trafień jest nieklikalny — inaczej filtr degeneruje do drzwi
+// bezstylowych i użytkownik dostaje wyniki bez związku ze stylem. Aktywny chip
+// zostaje klikalny zawsze, bo musi dać się odkliknąć.
+export function chipWygaszony(
+  etykieta: string,
+  grupa: Grupa,
+  stan: StanZapytania,
+  counts?: Record<string, number>,
+): boolean {
+  if (czyAktywny(stan, etykieta, grupa)) return false
+  return liczbaChipa(etykieta, counts) === 0
+}

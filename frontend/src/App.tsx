@@ -133,6 +133,7 @@ export default function App() {
               onRemove={handleRemove}
               onUndo={handleUndo}
               onReset={handleReset}
+              styleCounts={searchResult?.styleCounts}
             />
             <SearchResults
               appState={appState}
