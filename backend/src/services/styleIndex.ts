@@ -65,7 +65,7 @@ async function getIndeks(): Promise<WierszIndeksu[]> {
         name: meta.name,
         colorFamily: meta.color_family,
         hasGlass: meta.has_glass,
-        styles: STYLES.filter((s) => (meta as Record<string, unknown>)['style_' + s] === true),
+        styles: STYLES.filter((s) => (meta as unknown as Record<string, unknown>)['style_' + s] === true),
       })
     }
     offset += r.ids.length
