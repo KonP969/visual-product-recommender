@@ -192,6 +192,37 @@ export function explicitWoodFromQuery(query: string): ColorFamily[] | null {
   return WOOD_TERMS_RE.test(query) ? [...WOOD_FAMILIES] : null
 }
 
+// Gatunek drewna nazwany wprost. Rodzina koloru tu nie wystarcza: "Orzech
+// Ciemny" i "Dąb Ciemny" to oba dark_wood, a klient prosił o orzech.
+// Klucz → [wzorzec w zapytaniu, wzorzec w nazwie wariantu].
+const FINISH_TERMS: Array<[string, RegExp, RegExp]> = [
+  ['orzech', /\borzech\w*|\bwalnut\b/i, /orzech/i],
+  ['dab', /\bd[ęe]b\w*|\bd[ąa]b\w*|\boak\b/i, /d[ąa]b|d[ęe]b/i],
+  ['jesion', /\bjesion\w*|\bash\b/i, /jesion/i],
+  ['akacja', /\bakacj\w*|\bacacia\b/i, /akacj/i],
+  ['sosna', /\bsosn\w*|\bpine\b/i, /sosn/i],
+  ['buk', /\bbuk\w*|\bbeech\b/i, /\bbuk/i],
+  ['wenge', /\bwenge\b/i, /wenge/i],
+  ['hikora', /\bhikor\w*/i, /hikor/i],
+]
+
+/**
+ * Konkretny gatunek wybarwienia nazwany w zapytaniu ("orzech", "dębowe").
+ * Zwraca null, gdy user prosi o drewno ogólnie ("drewno naturalne") — wtedy
+ * zawężamy tylko do rodzin drewna, bez wskazywania gatunku.
+ */
+export function explicitFinishFromQuery(query: string): string | null {
+  const found = FINISH_TERMS.filter(([, queryRe]) => queryRe.test(query))
+  // Wiele gatunków naraz → nie zgadujemy, który jest wiodący.
+  return found.length === 1 ? found[0][0] : null
+}
+
+/** Czy nazwa produktu (wraz z wariantem) należy do wskazanego wybarwienia? */
+export function finishMatches(productName: string, finish: string): boolean {
+  const entry = FINISH_TERMS.find(([key]) => key === finish)
+  return entry ? entry[2].test(productName) : true
+}
+
 // Rzeczowniki oznaczające DETAL drzwi — kolor stojący przy nich opisuje ten
 // detal, nie skrzydło ("czarne szkło" na szarych drzwiach jest poprawne).
 const DETAIL_NOUN_RE = /szk[łl]|szyb|intarsj|wstawk|okuc|klamk|uchwyt|zawias|listw|ram[ake]/i

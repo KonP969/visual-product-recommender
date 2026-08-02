@@ -3,6 +3,8 @@ import {
   classifyDoor,
   explicitColorFromQuery,
   explicitWoodFromQuery,
+  explicitFinishFromQuery,
+  finishMatches,
   reasonConflictsWithColor,
   classifyStyles,
   styleFlags,
@@ -128,6 +130,37 @@ describe('explicitWoodFromQuery', () => {
   it('nazwany odcień drewna ma pierwszeństwo — kolor, nie cała paleta', () => {
     // "ciemny orzech" to konkretna rodzina; guard koloru łapie to pierwszy
     expect(explicitColorFromQuery('drzwi w kolorze ciemnego orzecha')).toEqual(['dark_wood'])
+  })
+})
+
+describe('explicitFinishFromQuery — konkretne wybarwienie', () => {
+  it.each([
+    ['drzwi w kolorze ciemnego orzecha', 'orzech'],
+    ['drzwi dębowe', 'dab'],
+    ['jesionowe drzwi', 'jesion'],
+    ['drzwi wenge', 'wenge'],
+  ])('%s → %s', (query, expected) => {
+    expect(explicitFinishFromQuery(query)).toBe(expected)
+  })
+
+  it.each(['drewno naturalne', 'białe drzwi', 'ciemne drzwi'])(
+    '%s → null (gatunek nienazwany)',
+    (query) => {
+      expect(explicitFinishFromQuery(query)).toBeNull()
+    },
+  )
+})
+
+describe('finishMatches — nazwa wariantu wobec wybarwienia', () => {
+  it('dopasowuje gatunek w nazwie wariantu', () => {
+    expect(finishMatches('NATURA CLASSIC model 1.1 - Orzech Ciemny', 'orzech')).toBe(true)
+    expect(finishMatches('PORTA LEVEL model B.2 - Dąb Arles Naturalny', 'dab')).toBe(true)
+  })
+
+  it('odrzuca inny gatunek z tej samej rodziny koloru', () => {
+    // sedno zgłoszenia A2: dąb ciemny to nie orzech, choć oba to dark_wood
+    expect(finishMatches('PORTA CLASSIC HOME model C.1 - Dąb Ciemny', 'orzech')).toBe(false)
+    expect(finishMatches('PORTA VERTE HOME model H.1 - Wenge White', 'dab')).toBe(false)
   })
 })
 

@@ -103,6 +103,8 @@ export interface SearchFilters {
   colors: ColorFamily[] | null
   glass: boolean | null
   style: Style | null
+  /** gatunek wybarwienia z guardu, nie od LLM-a (patrz explicitFinishFromQuery) */
+  finish?: string | null
 }
 
 export interface WildCard {

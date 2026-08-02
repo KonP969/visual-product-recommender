@@ -1,6 +1,7 @@
 import { createHash } from 'crypto'
 import { ChromaClient, Collection } from 'chromadb'
 import type { Style } from './attributeService'
+import { finishMatches } from './attributeService'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const COLLECTION_NAME = 'products'
@@ -42,6 +43,8 @@ export interface HardFilters {
   colors?: string[] | null
   glass?: boolean | null
   style?: Style | null
+  /** gatunek wybarwienia ("orzech", "dab") — filtr po nazwie, nie po metadanej */
+  finish?: string | null
 }
 
 export interface SearchResultItem {
@@ -251,8 +254,10 @@ export async function searchSimilar(
     return { results: [], isLowSimilarity: false }
   }
 
-  // Fetch a larger candidate pool so MMR has room to diversify
-  const candidateN = Math.min(n * candidateMultiplier, count)
+  // Fetch a larger candidate pool so MMR has room to diversify.
+  // Wybarwienie odsiewa po nazwie już PO pobraniu, więc pula musi być większa.
+  const effMultiplier = filters?.finish ? candidateMultiplier * 8 : candidateMultiplier
+  const candidateN = Math.min(n * effMultiplier, count)
 
   // Twarde filtry są nienegocjowalne: gdy dają mniej wyników, zwracamy mniej —
   // nigdy nie dopełniamy produktami łamiącymi ograniczenia użytkownika.
@@ -262,6 +267,15 @@ export async function searchSimilar(
   if (candidates.length === 0 && !filters?.colors && filters?.glass == null && filters?.style == null) {
     const all = await queryCandidates(embedding, candidateN)
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
+  }
+
+  // Gatunek wybarwienia: rodzina koloru go nie rozróżnia ("Dąb Ciemny" i
+  // "Orzech Ciemny" to oba dark_wood), więc odsiewamy po nazwie wariantu.
+  // Pusty wynik oznaczałby ślepą uliczkę — wtedy wolimy całą rodzinę koloru.
+  if (filters?.finish) {
+    const byFinish = candidates.filter((c) => finishMatches(c.metadata.name, filters.finish!))
+    if (byFinish.length > 0) candidates = byFinish
+    else console.warn(`[CHROMA] Brak wariantow o wybarwieniu "${filters.finish}" — pomijam filtr`)
   }
 
   // isLowSimilarity liczymy PRZED jitterem — z prawdziwego similarity

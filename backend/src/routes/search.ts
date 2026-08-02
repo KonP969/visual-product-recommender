@@ -12,6 +12,7 @@ import {
 import {
   explicitColorFromQuery,
   explicitWoodFromQuery,
+  explicitFinishFromQuery,
   explicitStyleFromQuery,
   STYLES,
 } from '../services/attributeService'
@@ -218,6 +219,14 @@ searchRouter.post('/search-text', async (req, res) => {
         description.filters = { ...description.filters, colors: woodColors }
         console.log(`[SEARCH-TEXT] Guard: wymuszono drewno ${JSON.stringify(woodColors)}`)
       }
+    }
+
+    // Wybarwienie: gatunek nazwany wprost ("orzech", "dębowe"). Rodzina koloru
+    // jest zbyt zgrubna — dark_wood miesza orzech z dębem ciemnym i mokką.
+    const finish = explicitFinishFromQuery(guardText)
+    if (finish) {
+      description.filters = { ...description.filters, finish }
+      console.log(`[SEARCH-TEXT] Guard: wymuszono wybarwienie ${finish}`)
     }
 
     // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard z tekstu.
