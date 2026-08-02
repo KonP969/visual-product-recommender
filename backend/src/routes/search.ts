@@ -9,7 +9,12 @@ import {
   explainMatches,
   DoorDescription,
 } from '../services/geminiService'
-import { explicitColorFromQuery, explicitStyleFromQuery, STYLES } from '../services/attributeService'
+import {
+  explicitColorFromQuery,
+  explicitWoodFromQuery,
+  explicitStyleFromQuery,
+  STYLES,
+} from '../services/attributeService'
 import type { Style } from '../services/attributeService'
 
 const upload = multer({
@@ -204,6 +209,15 @@ searchRouter.post('/search-text', async (req, res) => {
     if (explicitColors) {
       description.filters = { ...description.filters, colors: explicitColors }
       console.log(`[SEARCH-TEXT] Guard: wymuszono kolor ${JSON.stringify(explicitColors)}`)
+    } else {
+      // Materiał: "drzwi dębowe" / "drewno naturalne" nie nazywają odcienia, więc
+      // guard koloru milczy — a wtedy LLM trzymał kolor bazy ("białe") i gubił
+      // prośbę o drewno. Cała paleta drewna zamiast biele.
+      const woodColors = explicitWoodFromQuery(guardText)
+      if (woodColors) {
+        description.filters = { ...description.filters, colors: woodColors }
+        console.log(`[SEARCH-TEXT] Guard: wymuszono drewno ${JSON.stringify(woodColors)}`)
+      }
     }
 
     // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard z tekstu.

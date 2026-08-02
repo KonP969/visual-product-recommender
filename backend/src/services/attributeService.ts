@@ -169,6 +169,29 @@ export function explicitColorFromQuery(query: string): ColorFamily[] | null {
   return found.size === 1 ? [...found] : null
 }
 
+// Wszystkie rodziny drewna — intencja "chcę drewno" nie wskazuje odcienia.
+export const WOOD_FAMILIES: ColorFamily[] = ['light_wood', 'medium_wood', 'dark_wood']
+
+// Gatunki i określenia drewna BEZ wskazania odcienia. Intencją jest usłojenie,
+// nie konkretna rodzina — dlatego wymuszamy całą paletę drewna.
+const WOOD_TERMS_RE =
+  /\bd[ęe]b\w*|\borzech\w*|\bjesion\w*|\bakacj\w*|\bsosn\w*|\bbuk\w*|\bdrewn\w*|\bfornir\w*|\bwood\w*|\boak\b|\bwalnut\b/i
+
+// Tylko korekty jasności — węższe niż RELATIVE_OR_VAGUE_RE, bo "drewniane"
+// samo w sobie JEST teraz twardą intencją, a nie mgłą.
+const RELATIVE_LIGHTNESS_RE = /jaśniej\w*|jasniej\w*|ciemniej\w*|lighter|darker/i
+
+/**
+ * Twarda intencja materiału: użytkownik poprosił o drewno, nie nazywając odcienia.
+ * Zwraca całą paletę drewna, żeby kolor z zamrożonej bazy (np. "białe" z opisu
+ * wnętrza) nie przykrył prośby o usłojenie. Gdy odcień JEST nazwany
+ * ("ciemny orzech"), pierwszeństwo ma explicitColorFromQuery — patrz search.ts.
+ */
+export function explicitWoodFromQuery(query: string): ColorFamily[] | null {
+  if (RELATIVE_LIGHTNESS_RE.test(query)) return null
+  return WOOD_TERMS_RE.test(query) ? [...WOOD_FAMILIES] : null
+}
+
 // Rzeczowniki oznaczające DETAL drzwi — kolor stojący przy nich opisuje ten
 // detal, nie skrzydło ("czarne szkło" na szarych drzwiach jest poprawne).
 const DETAIL_NOUN_RE = /szk[łl]|szyb|intarsj|wstawk|okuc|klamk|uchwyt|zawias|listw|ram[ake]/i

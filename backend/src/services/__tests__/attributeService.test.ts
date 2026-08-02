@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyDoor,
   explicitColorFromQuery,
+  explicitWoodFromQuery,
   reasonConflictsWithColor,
   classifyStyles,
   styleFlags,
@@ -99,6 +100,34 @@ describe('explicitColorFromQuery', () => {
     'czarne albo białe', // dwa kolory → niejednoznaczne
   ])('%s → null (zostawione LLM-owi)', (query) => {
     expect(explicitColorFromQuery(query)).toBeNull()
+  })
+})
+
+describe('explicitWoodFromQuery', () => {
+  const WOOD = ['light_wood', 'medium_wood', 'dark_wood']
+
+  it.each([
+    'drzwi dębowe', // gatunek bez odcienia — dziura, przez którą baza narzucała biel
+    'drewno naturalne', // etykieta chipa materiału
+    'drewniane drzwi',
+    'drzwi orzechowe',
+    'jesionowe drzwi',
+  ])('%s → cała paleta drewna', (query) => {
+    expect(explicitWoodFromQuery(query)).toEqual(WOOD)
+  })
+
+  it.each([
+    'białe drzwi', // brak sygnału drewna
+    'nowoczesne drzwi',
+    'drewno, ale jaśniejsze', // korekta względna → LLM decyduje
+    'dębowe, ale ciemniejsze',
+  ])('%s → null (zostawione LLM-owi)', (query) => {
+    expect(explicitWoodFromQuery(query)).toBeNull()
+  })
+
+  it('nazwany odcień drewna ma pierwszeństwo — kolor, nie cała paleta', () => {
+    // "ciemny orzech" to konkretna rodzina; guard koloru łapie to pierwszy
+    expect(explicitColorFromQuery('drzwi w kolorze ciemnego orzecha')).toEqual(['dark_wood'])
   })
 })
 
