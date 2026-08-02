@@ -246,7 +246,12 @@ export async function searchSimilar(
   filters?: HardFilters,
   seed?: string,
   candidateMultiplier = 5,
-): Promise<{ results: SearchResultItem[]; isLowSimilarity: boolean }> {
+): Promise<{
+  results: SearchResultItem[]
+  isLowSimilarity: boolean
+  /** wybarwienie, o które proszono, ale nie ma go w puli — do pokazania userowi */
+  droppedFinish?: string
+}> {
   const col = await getCollection()
   const count = await col.count()
 
@@ -272,10 +277,16 @@ export async function searchSimilar(
   // Gatunek wybarwienia: rodzina koloru go nie rozróżnia ("Dąb Ciemny" i
   // "Orzech Ciemny" to oba dark_wood), więc odsiewamy po nazwie wariantu.
   // Pusty wynik oznaczałby ślepą uliczkę — wtedy wolimy całą rodzinę koloru.
+  let droppedFinish: string | undefined
   if (filters?.finish) {
     const byFinish = candidates.filter((c) => finishMatches(c.metadata.name, filters.finish!))
-    if (byFinish.length > 0) candidates = byFinish
-    else console.warn(`[CHROMA] Brak wariantow o wybarwieniu "${filters.finish}" — pomijam filtr`)
+    if (byFinish.length > 0) {
+      candidates = byFinish
+    } else {
+      // Milczące pominięcie filtra wygląda jak awaria wyszukiwarki — mówimy wprost.
+      droppedFinish = filters.finish
+      console.warn(`[CHROMA] Brak wariantow o wybarwieniu "${filters.finish}" — pomijam filtr`)
+    }
   }
 
   // isLowSimilarity liczymy PRZED jitterem — z prawdziwego similarity
@@ -288,6 +299,7 @@ export async function searchSimilar(
   return {
     results,
     isLowSimilarity: topSimilarity < LOW_SIMILARITY_THRESHOLD,
+    droppedFinish,
   }
 }
 

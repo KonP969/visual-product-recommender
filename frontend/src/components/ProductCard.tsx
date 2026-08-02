@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Product } from '@/types'
+import { warianty } from '@/lib/plural'
 
 interface ProductCardProps {
   product: Product
@@ -27,6 +28,9 @@ export function ProductCard({ product }: ProductCardProps) {
   // the part after " - " is the finish/colour variant (sometimes empty).
   const [rawTitle, variant] = product.name.split(' - ')
   const title = rawTitle.replace(/\s*-\s*$/, '').trim()
+  // "od" ma sens tylko wtedy, gdy naprawdę jest z czego wybierać — przy jednym
+  // wariancie sugerowałoby nieistniejące tańsze opcje.
+  const maWarianty = Boolean(product.variantCount && product.variantCount > 1)
 
   const content = (
     <article className="group flex h-full flex-col gap-2.5">
@@ -66,10 +70,12 @@ export function ProductCard({ product }: ProductCardProps) {
       {variant && <p className="-mt-1.5 m-0 text-[13px] text-ink-soft">{variant}</p>}
       <div className="mt-auto flex items-baseline justify-between gap-2">
         <span className="font-display text-[16px] text-ink [font-variant-numeric:tabular-nums]">
-          {formatPrice(product.priceFrom ?? product.price)} zł{' '}
-          <small className="font-sans text-[10px] uppercase tracking-[0.05em] text-ink-soft">
-            od
-          </small>
+          {maWarianty && (
+            <small className="font-sans text-[10px] uppercase tracking-[0.05em] text-ink-soft">
+              od{' '}
+            </small>
+          )}
+          {formatPrice(product.priceFrom ?? product.price)} zł
         </span>
         {product.productUrl && (
           <span className="whitespace-nowrap border-b border-current text-[13px] text-brass transition-colors group-hover:text-brass-deep">
@@ -77,9 +83,9 @@ export function ProductCard({ product }: ProductCardProps) {
           </span>
         )}
       </div>
-      {product.variantCount && product.variantCount > 1 && (
+      {maWarianty && (
         <p className="m-0 -mt-1 text-[11px] text-ink-soft/80">
-          {product.variantCount} warianty w konfiguratorze
+          {warianty(product.variantCount!)} do wyboru
         </p>
       )}
     </article>

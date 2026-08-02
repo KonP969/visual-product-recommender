@@ -49,17 +49,36 @@ function toProducts(results: SearchResultItem[]) {
   }))
 }
 
+// Klucz techniczny wybarwienia → nazwa, którą klient sam by wypowiedział.
+const FINISH_PL: Record<string, string> = {
+  orzech: 'orzech',
+  dab: 'dąb',
+  jesion: 'jesion',
+  akacja: 'akacja',
+  sosna: 'sosna',
+  buk: 'buk',
+  wenge: 'wenge',
+  hikora: 'hikora',
+}
+
 function buildResultPayload(
   description: DoorDescription | null,
   results: SearchResultItem[],
   isLowSimilarity: boolean,
+  droppedFinish?: string,
 ) {
+  // Gdy pominęliśmy filtr, mówimy o tym wprost — cicha podmiana kryteriów
+  // wygląda jak awaria wyszukiwarki i kosztuje zaufanie.
+  const notice = droppedFinish
+    ? `Nie mamy drzwi w wybarwieniu „${FINISH_PL[droppedFinish] ?? droppedFinish}” przy pozostałych kryteriach — pokazujemy zbliżone kolorystycznie.`
+    : undefined
   if (results.length === 0) {
     return {
       products: [],
       description: description?.clipQuery,
       displayDescription: description?.displayPl,
       status: 'empty-catalog' as const,
+      notice,
     }
   }
   return {
@@ -67,6 +86,7 @@ function buildResultPayload(
     description: description?.clipQuery,
     displayDescription: description?.displayPl,
     status: isLowSimilarity ? ('low-similarity' as const) : ('success' as const),
+    notice,
   }
 }
 
@@ -246,9 +266,17 @@ searchRouter.post('/search-text', async (req, res) => {
     const embedding = await getTextEmbedding(description.clipQuery)
     console.log(`[SEARCH-TEXT] Filters: ${JSON.stringify(description.filters)}`)
     const seed = createHash('sha256').update(query).digest('hex')
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, description.filters, seed)
+    const { results, isLowSimilarity, droppedFinish } = await searchSimilar(
+      embedding,
+      10,
+      description.filters,
+      seed,
+    )
 
-    send({ type: 'result', data: buildResultPayload(description, results, isLowSimilarity) })
+    send({
+      type: 'result',
+      data: buildResultPayload(description, results, isLowSimilarity, droppedFinish),
+    })
     await sendMatchReasons(send, description, results)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed'

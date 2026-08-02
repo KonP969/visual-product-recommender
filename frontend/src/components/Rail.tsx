@@ -53,7 +53,9 @@ export function Rail({
   }
 
   return (
-    <aside className="flex flex-col gap-6 lg:sticky lg:top-6">
+    // Sticky panel wyższy od ekranu miał nieosiągalny dół — własny scroll
+    // sprawia, że kółko nad lewą kolumną przewija ją, a nie siatkę produktów.
+    <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
       <div className="sr-only" aria-live="polite">
         {kroki.length > 0
           ? `Aktywne doprecyzowania: ${kroki.map((k) => k.etykieta).join(', ')}.`

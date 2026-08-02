@@ -27,6 +27,8 @@ export interface SearchResult {
   /** Odważna alternatywa projektanta (tylko wyszukiwanie ze zdjęcia) */
   wildcard?: Wildcard | null
   status: 'success' | 'empty-catalog' | 'low-similarity'
+  /** Kryterium, którego nie dało się spełnić — mówimy o tym wprost, nie po cichu */
+  notice?: string
 }
 
 export interface ApiResponse<T> {

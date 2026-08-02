@@ -1,4 +1,4 @@
-import { Loader2, AlertCircle, PackageSearch, SearchX, Sparkles, ScanSearch, Lightbulb } from 'lucide-react'
+import { Loader2, AlertCircle, PackageSearch, SearchX, Sparkles, ScanSearch, Lightbulb, Info } from 'lucide-react'
 import type { AppState, SearchResult, SearchStage } from '@/types'
 import { ResultsGrid } from './ResultsGrid'
 import { ProductCard } from './ProductCard'
@@ -92,6 +92,12 @@ export function SearchResults({
               : 'propozycji'}
         </span>
       </div>
+      {searchResult.notice && (
+        <div className="mb-5 flex items-center gap-2 rounded-xl border border-ink-soft/20 bg-panel px-4 py-3 text-sm text-ink-soft">
+          <Info className="h-4 w-4 flex-shrink-0" />
+          {searchResult.notice}
+        </div>
+      )}
       {appState === 'low-similarity' && (
         <div className="mb-5 flex items-center gap-2 rounded-xl border border-brass/30 bg-brass-soft px-4 py-3 text-sm text-brass-deep">
           <SearchX className="h-4 w-4 flex-shrink-0" />
