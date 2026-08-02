@@ -129,11 +129,18 @@ Po ustaleniu `description.filters` (guardy koloru → drewna → wybarwienia →
 `buildResultPayload(description, results, isLowSimilarity, droppedFinish, droppedStyle)`
 skleja komunikat:
 
-> „W białych nie ma drzwi rustykalnych — pokazujemy białe bez filtra stylu."
+> „Nie mamy drzwi w stylu rustykalnym przy pozostałych kryteriach — pokazujemy
+> wyniki bez filtra stylu."
+
+Komunikat świadomie NIE nazywa koloru („w białych nie ma…"): `filters.colors`
+bywa listą kilku rodzin naraz (guard drewna ustawia trzy), więc nazwanie koloru
+byłoby zgadywaniem. Zdanie ma tę samą budowę co istniejący komunikat o wybarwieniu.
 
 Gdy odpadły oba filtry, obie informacje trafiają do jednego pola `notice`
 (zdania sklejone spacją) — typ odpowiedzi we froncie bez zmian. Mapa
-`STYLE_PL` tłumaczy enum na przymiotnik w komunikacie (jak `FINISH_PL`).
+`STYLE_PL` tłumaczy enum na przymiotnik w miejscowniku (jak `FINISH_PL`).
+Obie mapy i sklejanie mieszkają w `backend/src/routes/searchNotices.ts` — osobnym
+module, żeby dało się je testować bez ładowania Expressa i Gemini.
 
 `chromaService.ts` bez zmian: decyzja o pominięciu stylu należy do trasy, która
 i tak liczy przekroje. `buildWhere` nadal dokleja `$or [styl, style_none]` — po
