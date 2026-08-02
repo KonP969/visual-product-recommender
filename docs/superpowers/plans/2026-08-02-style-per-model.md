@@ -944,9 +944,11 @@ Expected: `tsc` bez wyjścia, wszystkie testy zielone.
 
 Run:
 ```bash
-curl -s -X POST http://localhost:3001/api/search-text -H "Content-Type: application/json" -d "{\"query\":\"biale drzwi rustykalne\"}" | tail -2
+curl -s -X POST http://localhost:3001/api/search-text -H "Content-Type: application/json" -d "{\"query\":\"czarne drzwi rustykalne\"}" | tail -2
 ```
 Expected: w zdarzeniu `result` pole `styleCounts` z `"rustykalny":0` oraz `notice` zawierające „Nie mamy drzwi w stylu rustykalnym". Wyniki NIE zawierają `PORTA Steel EI 60 Plus`.
+
+> Czarne, nie białe: po backfillu z Taska 2 białe rustykalne ISTNIEJĄ (9 sztuk — warianty „Dąb Biały" modeli VECTOR, OSLO, LOFT 7.1, RESIST, które wcześniej gubiły styl). To zamierzony efekt poprawki. Pusty pozostaje przekrój `black × rustykalny` (0 rekordów, potwierdzone macierzą kolor×styl).
 
 - [ ] **Step 8: Commit**
 
@@ -1177,8 +1179,8 @@ W `frontend/src/App.tsx`, w wywołaniu `<Rail ... />` (linie 124–136) dopisz p
 
 - [ ] **Step 8: Weryfikacja frontu**
 
-Run: `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`
-Expected: testy zielone (33 + 9), `tsc` bez błędów, build zielony.
+Run: `cd frontend && npx vitest run && npm run build`
+Expected: testy zielone (33 + 9), build zielony (skrypt `build` = `tsc -b && vite build`, więc typy są sprawdzane).
 
 - [ ] **Step 9: Commit**
 
@@ -1215,9 +1217,15 @@ Expected: nazwy z listy rustykalnych modeli (VERDINO, PORTA LOFT model 4.A, RESI
 
 Run:
 ```bash
+curl -s -X POST http://localhost:3001/api/search-text -H "Content-Type: application/json" -d "{\"query\":\"czarne drzwi rustykalne\",\"style\":\"rustykalny\"}" | tail -2
+```
+Expected: `notice` z „Nie mamy drzwi w stylu rustykalnym", `styleCounts` z `"rustykalny":0`, wyniki czarne, bez `PORTA Steel EI 60 Plus`.
+
+Dodatkowo sprawdź, że przekrój, który po Tasku 2 przestał być pusty, faktycznie zwraca wyniki bez komunikatu:
+```bash
 curl -s -X POST http://localhost:3001/api/search-text -H "Content-Type: application/json" -d "{\"query\":\"biale drzwi rustykalne\",\"style\":\"rustykalny\"}" | tail -2
 ```
-Expected: `notice` z „Nie mamy drzwi w stylu rustykalnym", `styleCounts` z `"rustykalny":0`, wyniki białe, bez `PORTA Steel EI 60 Plus`.
+Expected: `styleCounts` z `"rustykalny":9`, brak `notice` o stylu, w wynikach warianty „Dąb Biały" (VECTOR, OSLO, LOFT 7.1, RESIST).
 
 - [ ] **Step 4: Ten sam model w różnych kolorach zachowuje styl**
 
