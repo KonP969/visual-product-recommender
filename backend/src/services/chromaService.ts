@@ -193,8 +193,13 @@ export function buildWhere(filters?: HardFilters): Record<string, unknown> {
     conditions.push({ has_glass: filters.glass })
   }
   if (filters?.style) {
-    // Styl LUB bezstylowe — bezstylowych (ubogi opis) nigdy nie chowamy.
-    conditions.push({ $or: [{ ['style_' + filters.style]: true }, { style_none: true }] })
+    // Twardo: sam styl. Wcześniej stało tu "$or [styl, style_none]" — furtka dla
+    // drzwi z ubogim opisem (425 wariantów, 5% katalogu). Po przejściu na styl per
+    // model zostało ich 26 (0,3%), a furtka kosztowała dwie rzeczy: liczba na chipie
+    // przestawała odpowiadać liście, a bezstylowe potrafiły wyprzedzić prawdziwe
+    // trafienia w rankingu. Pusty przekrój ma teraz jawny komunikat (resolveStyleFilter),
+    // więc podstawienie odbywa się otwarcie, a nie po cichu w warunku where.
+    conditions.push({ ['style_' + filters.style]: true })
   }
   return conditions.length === 1 ? conditions[0] : { $and: conditions }
 }

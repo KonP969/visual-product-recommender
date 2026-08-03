@@ -160,9 +160,18 @@ Gdy odpadły oba filtry, obie informacje trafiają do jednego pola `notice`
 Obie mapy i sklejanie mieszkają w `backend/src/routes/searchNotices.ts` — osobnym
 module, żeby dało się je testować bez ładowania Expressa i Gemini.
 
-`chromaService.ts` bez zmian: decyzja o pominięciu stylu należy do trasy, która
-i tak liczy przekroje. `buildWhere` nadal dokleja `$or [styl, style_none]` — po
-nowej regule to już tylko 26 wariantów bezstylowych.
+Decyzja o pominięciu stylu należy do trasy, która i tak liczy przekroje.
+
+**Zabezpieczenie `style_none` zdjęte (2026-08-03, po finalnym przeglądzie).**
+`buildWhere` filtrował dotąd `$or [styl, style_none]`, żeby nie chować drzwi
+z ubogim opisem — regułą ze specu `2026-07-19-style-filter-design.md`, gdy
+dotyczyła 425 wariantów (5% katalogu). Po przejściu na styl per model zostało
+ich 26 (0,3%), a furtka zaczęła kosztować więcej, niż dawała: liczba na chipie
+(„80 rustykalnych") przestawała odpowiadać długości listy, a bezstylowe potrafiły
+wyprzedzić prawdziwe trafienia — `PORTA VERTE HOME model B.5 Szprosy`
+(`style_none`) lądował PIERWSZY przy filtrze rustykalnym. `buildWhere` filtruje
+teraz twardo po samej fladze stylu. Pusty przekrój obsługuje jawny komunikat, czyli
+uczciwa wersja tego samego podstawienia — a cicha wersja zniknęła z warunku `where`.
 
 ### Frontend
 

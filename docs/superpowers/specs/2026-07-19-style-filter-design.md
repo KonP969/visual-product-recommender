@@ -19,6 +19,11 @@ jak kolorowi.
    opis — nie jeden arbitralny kubełek. To usuwa ryzyko „zła metka → drzwi znikają".
 4. **Zabezpieczenie:** drzwi bez wykrytego stylu (~5%, 423 szt.) NIGDY nie są
    odcinane przez filtr stylu — pokazują się przy każdym stylu.
+   > **ODWOŁANE 2026-08-03** (spec `2026-08-02-style-per-model-design.md`). Po
+   > przejściu na styl per model bezstylowych zostało 26 (0,3%), a furtka zaczęła
+   > szkodzić: liczba na chipie przestawała odpowiadać liście wyników, a bezstylowe
+   > potrafiły wyprzedzić prawdziwe trafienia w rankingu. `buildWhere` filtruje
+   > teraz twardo po samej fladze stylu; pusty przekrój obsługuje jawny komunikat.
 5. **Źródło klasyfikacji:** opis EN (już w metadanych), bez wizji, bez Gemini.
 6. **Chipy:** wszystkie 7 w osobnym, podpisanym rzędzie „Styl" we froncie.
 7. **Chip wysyła styl WPROST** (nie przez tekst) — bo opis bazowy często sam

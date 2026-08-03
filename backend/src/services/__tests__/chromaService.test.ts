@@ -188,21 +188,24 @@ describe('applyMMR — zachowuje variantCount/priceFrom', () => {
   })
 })
 
-describe('buildWhere — filtr stylu z zabezpieczeniem', () => {
-  it('styl → $or (styl LUB bezstylowe)', () => {
-    const where = buildWhere({ style: 'klasyczny' }) as { $and?: unknown[] }
-    // przy samym stylu: pojedynczy warunek NIE jest owijany w $and, chyba że jest też category
-    const cond = JSON.stringify(where)
+describe('buildWhere — filtr stylu', () => {
+  // Zabezpieczenie "$or [styl, style_none]" ZDJĘTE świadomie (decyzja 2026-08-03).
+  // Chroniło 425 wariantów z ubogim opisem, ale po przejściu na styl per model
+  // zostało ich 26 (0,3%) — a psuły dwie rzeczy naraz: liczba na chipie przestawała
+  // odpowiadać długości listy, a bezstylowe potrafiły wygrać pierwsze miejsce
+  // z prawdziwymi trafieniami (PORTA VERTE HOME B.5 przy filtrze rustykalnym).
+  // Pusty przekrój ma teraz jawny komunikat (resolveStyleFilter) — czyli uczciwą
+  // wersję tego samego podstawienia.
+  it('styl → twardy warunek na fladze stylu, bez bezstylowych', () => {
+    const cond = JSON.stringify(buildWhere({ style: 'klasyczny' }))
     expect(cond).toContain('style_klasyczny')
-    expect(cond).toContain('style_none')
+    expect(cond).not.toContain('style_none')
   })
 
   it('styl łączy się z kolorem przez $and', () => {
     const where = buildWhere({ colors: ['black'], style: 'loft' }) as { $and: unknown[] }
     expect(where.$and).toContainEqual({ color_family: { $in: ['black'] } })
-    expect(where.$and).toContainEqual({
-      $or: [{ style_loft: true }, { style_none: true }],
-    })
+    expect(where.$and).toContainEqual({ style_loft: true })
   })
 
   it('brak stylu → brak warunku stylu', () => {
