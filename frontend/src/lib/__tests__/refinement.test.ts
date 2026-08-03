@@ -206,7 +206,10 @@ describe('chipWygaszony', () => {
   const pusty: StanZapytania = { baza: 'białe drzwi', kroki: [] }
 
   it('zero trafień → wygaszony', () => {
-    expect(chipWygaszony('rustykalne', 'styl', pusty, { rustykalny: 0 })).toBe(true)
+    // Fixture ma sąsiedni styl niezerowy — sam { rustykalny: 0 } jest
+    // nieodróżnialny od kompletu zer (F1: patrz test niżej), którego znaczenie
+    // jest inne ("nie wiem", nie "wygaszony").
+    expect(chipWygaszony('rustykalne', 'styl', pusty, { rustykalny: 0, klasyczny: 50 })).toBe(true)
   })
 
   it('są trafienia → aktywny', () => {
@@ -224,5 +227,28 @@ describe('chipWygaszony', () => {
 
   it('chipy spoza grupy styl nigdy nie są wygaszane', () => {
     expect(chipWygaszony('ze szkłem', 'szkło', pusty, { rustykalny: 0 })).toBe(false)
+  })
+
+  // F1: komplet zer we WSZYSTKICH stylach oznacza "nie wiem" (np. finish akurat
+  // wyzerował całą pulę po stronie backendu), nie "wszędzie pusto". Cały rząd
+  // wygaszonych, nieklikalnych chipów nigdy nie jest użyteczną informacją.
+  it('komplet zer we wszystkich stylach → nic nie wygaszone (F1)', () => {
+    const zera = {
+      klasyczny: 0,
+      nowoczesny: 0,
+      minimalistyczny: 0,
+      rustykalny: 0,
+      loft: 0,
+      skandynawski: 0,
+      glamour: 0,
+    }
+    expect(chipWygaszony('rustykalne', 'styl', pusty, zera)).toBe(false)
+    expect(chipWygaszony('klasyczne', 'styl', pusty, zera)).toBe(false)
+    expect(chipWygaszony('glamour', 'styl', pusty, zera)).toBe(false)
+  })
+
+  it('zero tylko dla JEDNEGO stylu, reszta niezerowa → nadal wygaszony (nie mylić z komletem zer)', () => {
+    const częściowe = { rustykalny: 0, klasyczny: 138 }
+    expect(chipWygaszony('rustykalne', 'styl', pusty, częściowe)).toBe(true)
   })
 })

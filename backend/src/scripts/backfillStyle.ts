@@ -44,7 +44,10 @@ async function main() {
   const metas: Record<string, unknown>[] = []
   const byStyle: Record<string, number> = {}
   for (const [, warianty] of byModel) {
-    const style = aggregateStyles(warianty.map((w) => classifyStyles(String(w.meta.description ?? ''))))
+    // Puste opisy (import z UI, obrazkowy) pomijamy PRZED głosowaniem — patrz
+    // ten sam guard i uzasadnienie w styleResolver.stylesForModel (F3).
+    const opisy = warianty.map((w) => String(w.meta.description ?? '')).filter((d) => d.trim())
+    const style = aggregateStyles(opisy.map((d) => classifyStyles(d)))
     const flags = styleFlags(style)
     const key = style.length ? style.join('+') : '(none)'
     byStyle[key] = (byStyle[key] ?? 0) + warianty.length
@@ -68,6 +71,12 @@ async function main() {
     console.log(`  ${String(n).padStart(5)}  ${k}`)
   }
   console.log('[STYLE] GOTOWE.')
+  // Ten skrypt to osobny proces — unieważnienie indeksu w pamięci NIE dosięga
+  // działającego backendu, więc liczniki chipów zostaną stare aż do restartu.
+  console.log(
+    '[STYLE] UWAGA: zrestartuj backend (albo dotknij dowolnego pliku w backend/src — ' +
+      'ts-node-dev przeładuje się sam), inaczej liczniki chipów stylu pozostaną sprzed backfillu.',
+  )
 }
 
 main().catch((e) => {

@@ -155,6 +155,11 @@ async function main() {
   const finalCount = await col.count()
   console.log(`[SYNC] GOTOWE. Usunięte: ${staleIds.length} | zaktualizowane: ${commonIds.length} | nowe: ${indexed} | nieudane: ${failed}`)
   console.log(`[SYNC] Baza po synchronizacji: ${finalCount} produktów`)
+  // Osobny proces — unieważnienie indeksu w pamięci nie dosięga backendu.
+  console.log(
+    '[SYNC] UWAGA: zrestartuj backend (albo dotknij dowolnego pliku w backend/src — ' +
+      'ts-node-dev przeładuje się sam), inaczej liczniki chipów stylu pozostaną sprzed synchronizacji.',
+  )
 }
 
 main().catch((e) => {

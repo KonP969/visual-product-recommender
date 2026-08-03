@@ -17,9 +17,19 @@ export interface WynikStylu {
   updated: number
 }
 
-/** Opisy wariantów jednego modelu → style modelu. Czysta, bez sieci. */
+/**
+ * Opisy wariantów jednego modelu → style modelu. Czysta, bez sieci.
+ *
+ * Puste opisy (import z UI jest obrazkowy — importService.ts nigdy nie zapisuje
+ * `description`) pomijamy PRZED głosowaniem. Gdyby liczyły się do mianownika
+ * (perVariant.length w aggregateStyles), rozwadniałyby większość i dla modeli
+ * WIELOETYKIETOWYCH potrafiły zdjąć styl, który realnie ma poparcie (F3).
+ * Model, którego WSZYSTKIE warianty nie mają opisu, nadal wypada jako
+ * style_none — to jest poprawny wynik, nie awaria.
+ */
 export function stylesForModel(descriptions: string[]): Style[] {
-  return aggregateStyles(descriptions.map((d) => classifyStyles(d)))
+  const niepuste = descriptions.filter((d) => d.trim())
+  return aggregateStyles(niepuste.map((d) => classifyStyles(d)))
 }
 
 export async function resolveStylesForProducts(

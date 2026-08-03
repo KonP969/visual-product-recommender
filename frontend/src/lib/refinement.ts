@@ -128,6 +128,16 @@ export function liczbaChipa(
   return enumStylu ? counts[enumStylu] : undefined
 }
 
+// Komplet zer we WSZYSTKICH stylach naraz nie znaczy "wszędzie pusto" — znaczy
+// "nie wiem" (backend: finish akurat wyzerował całą pulę, patrz F1 w
+// resolveStyleFilter). Cały wygaszony, nieklikalny rząd chipów nigdy nie jest
+// użyteczną informacją, więc w tym przypadku nic nie gasimy.
+function kompletZer(counts?: Record<string, number>): boolean {
+  if (!counts) return false
+  const wartości = Object.values(counts)
+  return wartości.length > 0 && wartości.every((n) => n === 0)
+}
+
 // Chip bez trafień jest nieklikalny — inaczej filtr degeneruje do drzwi
 // bezstylowych i użytkownik dostaje wyniki bez związku ze stylem. Aktywny chip
 // zostaje klikalny zawsze, bo musi dać się odkliknąć.
@@ -138,5 +148,6 @@ export function chipWygaszony(
   counts?: Record<string, number>,
 ): boolean {
   if (czyAktywny(stan, etykieta, grupa)) return false
+  if (kompletZer(counts)) return false
   return liczbaChipa(etykieta, counts) === 0
 }

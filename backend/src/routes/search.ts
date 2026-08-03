@@ -17,8 +17,7 @@ import {
   STYLES,
 } from '../services/attributeService'
 import type { Style } from '../services/attributeService'
-import { countStyles } from '../services/styleIndex'
-import { buildNotice } from './searchNotices'
+import { buildNotice, resolveStyleFilter } from './searchNotices'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -153,14 +152,11 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     const seed = createHash('sha256').update(req.file.buffer).digest('hex')
 
     // Liczniki chipów liczymy zawsze — front wygasza style bez trafień, zanim
-    // użytkownik w nie kliknie. Filtr stylu wykluczony: liczymy przekrój, w
-    // którym chip dopiero ma być kliknięty.
-    const styleCounts = await countStyles({ ...description?.filters, style: null })
-    let filters = description?.filters
-    let droppedStyle: Style | undefined
-    if (filters?.style && styleCounts[filters.style] === 0) {
-      droppedStyle = filters.style
-      filters = { ...filters, style: null }
+    // użytkownik w nie kliknie. Decyzja o ewentualnym pominięciu stylu (i drugie,
+    // tanie przeliczenie bez finish, gdy finish akurat wyzerował całą pulę) żyje
+    // w resolveStyleFilter — patrz F1/F5 w searchNotices.ts.
+    const { styleCounts, filters, droppedStyle } = await resolveStyleFilter(description?.filters)
+    if (droppedStyle) {
       console.warn(`[SEARCH] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
     }
     const { results, isLowSimilarity } = await searchSimilar(embedding, 10, filters, seed)
@@ -276,14 +272,13 @@ searchRouter.post('/search-text', async (req, res) => {
     console.log(`[SEARCH-TEXT] Filters: ${JSON.stringify(description.filters)}`)
     const seed = createHash('sha256').update(query).digest('hex')
 
-    const styleCounts = await countStyles({ ...description.filters, style: null })
-    let filters = description.filters
-    let droppedStyle: Style | undefined
-    if (filters?.style && styleCounts[filters.style] === 0) {
-      // Bez tego $or [styl, style_none] degeneruje do garstki drzwi bezstylowych,
-      // które ze stylem nie mają nic wspólnego (zgłoszenie: „pokazuje stalowe").
-      droppedStyle = filters.style
-      filters = { ...filters, style: null }
+    // Patrz komentarz w /search: resolveStyleFilter decyduje wobec filtrów, które
+    // faktycznie trafią do searchSimilar — nie wobec liczników wyzerowanych przez
+    // finish (miękki filtr). Bez tego $or [styl, style_none] degeneruje do garstki
+    // drzwi bezstylowych, które ze stylem nie mają nic wspólnego (zgłoszenie:
+    // „pokazuje stalowe").
+    const { styleCounts, filters, droppedStyle } = await resolveStyleFilter(description.filters)
+    if (droppedStyle) {
       console.warn(`[SEARCH-TEXT] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
     }
 

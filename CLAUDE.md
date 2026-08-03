@@ -52,6 +52,7 @@ npm run dev
 ## Ważne uwagi
 
 - **Dane w ChromaDB są trwałe** — folder `chroma_db/` na dysku. Nie trzeba importować ponownie po restarcie.
+- **Po `backfillStyle.ts` lub `syncCatalog.ts` zrestartuj backend** — liczniki trafień na chipach stylu jadą z indeksu trzymanego w pamięci procesu backendu. Skrypty to osobne procesy, więc nie mają jak go unieważnić. Import z UI takiego restartu nie wymaga (biegnie w procesie backendu).
 - **Tailwind v3** — projekt używa Tailwind v3 (nie v4) ze względu na 32-bitowy Node.js (brak binarek lightningcss dla ia32).
 - **Import feedu** — przez UI (panel "Import product catalog") lub curl:
   ```bash

@@ -114,6 +114,24 @@ kolorze, szkle i wybarwieniu — z pominięciem samego filtra stylu. Drzwi
 bezstylowe liczą się jako 0 dla każdego stylu; liczba na chipie odpowiada na
 pytanie „ile jest białych klasycznych", nie „ile zobaczę".
 
+**Wybarwienie jest filtrem MIĘKKIM** (`searchSimilar` odrzuca je, gdy pula
+kandydatów nie ma trafień, i zwraca `droppedFinish`), a `countStyles` traktuje je
+jak twarde. Gatunek, którego katalog w ogóle nie ma („buk"), wyzerowałby więc
+WSZYSTKIE liczniki naraz — a wtedy decyzja o pominięciu stylu byłaby fałszywa
+(komunikat „nie mamy drzwi rustykalnych" przy 97 rustykalnych w bazie) i cały rząd
+chipów zgasłby na raz. Dlatego: gdy komplet liczników wychodzi zerowy przy
+aktywnym `finish`, przeliczamy je jeszcze raz BEZ `finish` i dopiero na tym
+podejmujemy decyzję. Front traktuje komplet zer jako „nie wiem" i wtedy nie gasi
+żadnego chipa.
+
+**Unieważnianie indeksu działa tylko w procesie, który je wywołał.** Import z UI
+biegnie w procesie Expressa, więc tam jest natychmiastowe. `syncCatalog.ts`
+i `backfillStyle.ts` to osobne procesy `ts-node` — po nich backend trzyma stare
+liczniki do restartu. Oba skrypty przypominają o tym na końcu wyjścia, a zdanie
+o tym stoi w `CLAUDE.md`. Świadomie nie dokładamy endpointu do przeładowania ani
+TTL — to zwiększanie powierzchni API dla operacji uruchamianej ręcznie kilka razy
+w miesiącu.
+
 Wybarwienie jest filtrem po nazwie wariantu (nie po metadanej), więc indeks trzyma
 nazwy — liczby są dokładne także przy aktywnym `finish`.
 
