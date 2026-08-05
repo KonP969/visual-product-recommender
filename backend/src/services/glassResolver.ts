@@ -8,6 +8,7 @@ import { ChromaClient } from 'chromadb'
 import { GLASS_RE, SOLID_NAME_RE } from './attributeService'
 import { categorizeDoor } from './chromaService'
 import { classifyGlassFromImage } from './geminiService'
+import { overrideFor } from './overrides'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const CONCURRENCY = 3
@@ -34,6 +35,18 @@ export function decideGlassFromName(names: string[]): boolean | null {
   if (names.some((n) => GLASS_RE.test(n))) return true
   if (names.some((n) => SOLID_NAME_RE.test(n))) return false
   return null
+}
+
+/**
+ * Szkło modelu z uwzględnieniem tabeli korekt. Korekta ZASTĘPUJE decyzję automatu,
+ * bo dla części modeli packshot jej nie niesie: przy VERTE PREMIUM E.4 (cztery
+ * wąskie pasy szkła satynowego) cztery różne rodziny modeli wizyjnych zgodnie
+ * orzekają "listwa metalowa". Tu wygrywa wiedza eksperta domenowego.
+ */
+export function glassForModelName(modelName: string, decyzja: boolean | null): boolean | null {
+  const korekta = overrideFor(modelName)
+  if (korekta?.hasGlass !== undefined) return korekta.hasGlass
+  return decyzja
 }
 
 // Pobiera obraz i pyta model wizyjny. Zwraca null przy niepewności/błędzie.
@@ -143,8 +156,10 @@ export async function resolveGlassForProducts(nowe: NowyProdukt[]): Promise<Wyni
   const updIds: string[] = []
   const updMetas: Record<string, unknown>[] = []
   for (const [model, variants] of byModel) {
-    if (!decisions.has(model)) continue
-    const glass = decisions.get(model)!
+    // Korekta obowiązuje nawet dla modeli, których automat nie rozstrzygnął
+    // (brak wpisu w decisions) — dlatego pytamy ją PRZED sprawdzeniem decisions.
+    const glass = glassForModelName(model, decisions.has(model) ? decisions.get(model)! : null)
+    if (glass === null) continue
     for (const v of variants) {
       const meta = newMeta.get(v.id)
       if (meta && meta.has_glass !== glass) {

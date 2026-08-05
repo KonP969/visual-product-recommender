@@ -19,7 +19,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { ChromaClient } from 'chromadb'
 import { categorizeDoor } from '../services/chromaService'
-import { modelOf, decideGlassFromName, visionDecision } from '../services/glassResolver'
+import {
+  modelOf,
+  decideGlassFromName,
+  visionDecision,
+  glassForModelName,
+} from '../services/glassResolver'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
 const PROGRESS_FILE = join(__dirname, '..', '..', '..', 'scripts', 'backfill_glass_progress.json')
@@ -146,8 +151,11 @@ async function main() {
   const updMetas: Record<string, unknown>[] = []
   let flips = 0
   for (const [model, variants] of byModel) {
-    const dec = progress[model]
-    if (!dec || dec.glass === null) continue
+    // Korekta z tabeli przebija to, co zapisał przelot wizji, i obowiązuje także
+    // dla modeli, których wizja nie rozstrzygnęła.
+    const zProgressu = progress[model]
+    const dec = { glass: glassForModelName(model, zProgressu?.glass ?? null) }
+    if (dec.glass === null) continue
     for (const v of variants) {
       if (v.hasGlass !== dec.glass) {
         updIds.push(v.id)

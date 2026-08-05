@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { modelOf, decideGlassFromName } from '../glassResolver'
+import { modelOf, decideGlassFromName, glassForModelName } from '../glassResolver'
 
 describe('modelOf', () => {
   it.each([
@@ -39,5 +39,16 @@ describe('decideGlassFromName — precedencja z nazw', () => {
 
   it('pusta lista → null', () => {
     expect(decideGlassFromName([])).toBeNull()
+  })
+})
+
+describe('glassForModelName — korekta przebija decyzję automatu', () => {
+  it('bez wpisu w tabeli zwraca decyzję automatu', () => {
+    expect(glassForModelName('PORTA NOVA model 1', true)).toBe(true)
+    expect(glassForModelName('PORTA NOVA model 1', false)).toBe(false)
+  })
+
+  it('bez wpisu i bez decyzji zwraca null (model cichy)', () => {
+    expect(glassForModelName('PORTA NOVA model 1', null)).toBeNull()
   })
 })
