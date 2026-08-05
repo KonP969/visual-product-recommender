@@ -28,3 +28,7 @@ Thumbs.db
 .idea/
 scripts/logs/
 backend/.cache/
+
+# Artefakty przeglądu stylu — propozycje wizji i galeria (odtwarzalne ze skryptów)
+scripts/vision_style_proposals.json
+scripts/style-review.html
