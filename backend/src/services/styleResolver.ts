@@ -7,6 +7,7 @@ import { aggregateStyles, classifyStyles, styleFlags } from './attributeService'
 import type { Style } from './attributeService'
 import { categorizeDoor } from './chromaService'
 import { modelOf } from './glassResolver'
+import { overrideFor } from './overrides'
 import { invalidateStyleIndex } from './styleIndex'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
@@ -30,6 +31,17 @@ export interface WynikStylu {
 export function stylesForModel(descriptions: string[]): Style[] {
   const niepuste = descriptions.filter((d) => d.trim())
   return aggregateStyles(niepuste.map((d) => classifyStyles(d)))
+}
+
+/**
+ * Styl modelu z uwzględnieniem tabeli korekt. Korekta ZASTĘPUJE głosowanie —
+ * ekspert domenowy widzi drzwi, których opis EN nie oddaje (VIGO/CRAFT/VALLO
+ * to wizualnie deski, a opis mówi "modern flat panel").
+ */
+export function stylesForModelName(modelName: string, descriptions: string[]): Style[] {
+  const korekta = overrideFor(modelName)
+  if (korekta?.style !== undefined) return korekta.style
+  return stylesForModel(descriptions)
 }
 
 export async function resolveStylesForProducts(
@@ -67,9 +79,14 @@ export async function resolveStylesForProducts(
 
   const ids: string[] = []
   const metas: Record<string, unknown>[] = []
-  for (const [, warianty] of byModel) {
+  for (const [model, warianty] of byModel) {
     result.models++
-    const flags = styleFlags(stylesForModel(warianty.map((w) => String(w.meta.description ?? ''))))
+    const flags = styleFlags(
+      stylesForModelName(
+        model,
+        warianty.map((w) => String(w.meta.description ?? '')),
+      ),
+    )
     for (const w of warianty) {
       if (!Object.entries(flags).some(([k, v]) => w.meta[k] !== v)) continue
       ids.push(w.id)

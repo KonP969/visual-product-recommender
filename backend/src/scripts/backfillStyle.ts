@@ -3,8 +3,9 @@
 // Uruchomienie: cd backend && npx ts-node --transpile-only src/scripts/backfillStyle.ts
 import 'dotenv/config'
 import { ChromaClient } from 'chromadb'
-import { aggregateStyles, classifyStyles, styleFlags } from '../services/attributeService'
+import { styleFlags } from '../services/attributeService'
 import { modelOf } from '../services/glassResolver'
+import { stylesForModelName } from '../services/styleResolver'
 import { categorizeDoor } from '../services/chromaService'
 
 const CHROMA_URL = process.env.CHROMA_URL ?? 'http://localhost:8000'
@@ -43,11 +44,11 @@ async function main() {
   const ids: string[] = []
   const metas: Record<string, unknown>[] = []
   const byStyle: Record<string, number> = {}
-  for (const [, warianty] of byModel) {
-    // Puste opisy (import z UI, obrazkowy) pomijamy PRZED głosowaniem — patrz
-    // ten sam guard i uzasadnienie w styleResolver.stylesForModel (F3).
-    const opisy = warianty.map((w) => String(w.meta.description ?? '')).filter((d) => d.trim())
-    const style = aggregateStyles(opisy.map((d) => classifyStyles(d)))
+  for (const [model, warianty] of byModel) {
+    // Głosowanie z opisów + tabela korekt (korekta zastępuje wynik głosowania).
+    // Filtrowanie pustych opisów siedzi w stylesForModel — patrz uzasadnienie tam.
+    const opisy = warianty.map((w) => String(w.meta.description ?? ''))
+    const style = stylesForModelName(model, opisy)
     const flags = styleFlags(style)
     const key = style.length ? style.join('+') : '(none)'
     byStyle[key] = (byStyle[key] ?? 0) + warianty.length

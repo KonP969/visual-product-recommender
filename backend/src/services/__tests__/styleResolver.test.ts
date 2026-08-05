@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { stylesForModel } from '../styleResolver'
+import { stylesForModel, stylesForModelName } from '../styleResolver'
 
 describe('stylesForModel — opisy wariantów modelu → styl modelu', () => {
   it('większość opisów decyduje', () => {
@@ -55,5 +55,24 @@ describe('stylesForModel — opisy wariantów modelu → styl modelu', () => {
 
   it('model, którego WSZYSTKIE warianty nie mają opisu → style_none (pusty wynik), nie awaria', () => {
     expect(stylesForModel(['', '  ', ''])).toEqual([])
+  })
+})
+
+describe('stylesForModelName — korekta przebija głosowanie', () => {
+  it('bez wpisu w tabeli zachowuje się jak stylesForModel', () => {
+    const opisy = [
+      'modern residential interior door light oak',
+      'modern residential interior door white',
+      'classic raised panel residential door',
+    ]
+    expect(stylesForModelName('PORTA NOVA model 1', opisy)).toEqual(stylesForModel(opisy))
+  })
+
+  it('opisy mówiące "modern" nie przebijają korekty (pusta tabela → brak zmiany)', () => {
+    // Tabela w repo jest pusta na tym etapie, więc korekta nie działa dla żadnego
+    // modelu — ten test pilnuje, że brak wpisu NIE wywraca funkcji.
+    expect(stylesForModelName('PORTA VIGO model V.3', ['modern flat panel door'])).toEqual([
+      'nowoczesny',
+    ])
   })
 })
