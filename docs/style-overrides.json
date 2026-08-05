@@ -1,0 +1,5 @@
+{
+  "_opis": "Korekty stylu i przeszklenia wpisane przez eksperta domenowego. Przebijają automat (głosowanie z opisów, wizję szkła) i są nakładane po backfillu oraz po każdym imporcie. Klucz w 'modele' to nazwa modelu BEZ wariantu koloru (część przed ' - '). Klucz w 'kolekcje' to nazwa modelu bez członu 'model X.Y'. Model bije kolekcję, osobno dla stylu i osobno dla szkła. 'style': [] znaczy 'bez stylu'; brak korekty = brak pola.",
+  "kolekcje": {},
+  "modele": {}
+}
