@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { stylesForModel, stylesForModelName } from '../styleResolver'
+import { czytajTabele } from '../overrides'
 
 describe('stylesForModel — opisy wariantów modelu → styl modelu', () => {
   it('większość opisów decyduje', () => {
@@ -59,20 +62,26 @@ describe('stylesForModel — opisy wariantów modelu → styl modelu', () => {
 })
 
 describe('stylesForModelName — korekta przebija głosowanie', () => {
+  // Ta funkcja czyta docs/style-overrides.json, czyli plik, który ekspert domenowy
+  // katalogu edytuje. Testy MUSZĄ być odporne na jego treść — nazwa modelu
+  // wpisana na sztywno prędzej czy później trafi do tabeli i wywróci test.
+  const opisy = [
+    'modern residential interior door light oak',
+    'modern residential interior door white',
+    'classic raised panel residential door',
+  ]
+
   it('bez wpisu w tabeli zachowuje się jak stylesForModel', () => {
-    const opisy = [
-      'modern residential interior door light oak',
-      'modern residential interior door white',
-      'classic raised panel residential door',
-    ]
-    expect(stylesForModelName('PORTA NOVA model 1', opisy)).toEqual(stylesForModel(opisy))
+    expect(stylesForModelName('ATRAPA TESTOWA model 0', opisy)).toEqual(stylesForModel(opisy))
   })
 
-  it('opisy mówiące "modern" nie przebijają korekty (pusta tabela → brak zmiany)', () => {
-    // Tabela w repo jest pusta na tym etapie, więc korekta nie działa dla żadnego
-    // modelu — ten test pilnuje, że brak wpisu NIE wywraca funkcji.
-    expect(stylesForModelName('PORTA VIGO model V.3', ['modern flat panel door'])).toEqual([
-      'nowoczesny',
-    ])
+  it('wpis z tabeli ZASTĘPUJE głosowanie, choćby opisy mówiły co innego', () => {
+    const tabela = czytajTabele(
+      JSON.parse(readFileSync(join(process.cwd(), '..', 'docs', 'style-overrides.json'), 'utf-8')),
+    )
+    const kolekcja = Object.keys(tabela.kolekcje)[0]
+    if (!kolekcja) return // pusta tabela — nie ma czego sprawdzać
+    const oczekiwany = tabela.kolekcje[kolekcja].style
+    expect(stylesForModelName(`${kolekcja} model TEST`, opisy)).toEqual(oczekiwany)
   })
 })
