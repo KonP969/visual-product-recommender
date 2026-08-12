@@ -12,6 +12,11 @@
     "System Przesuwny BLACK": { "style": ["rustykalny"] }
   },
   "modele": {
+    "PORTA VECTOR PREMIUM Bulaj Szyba Matowa": { "style": ["nowoczesny", "minimalistyczny"] },
+    "PORTA VECTOR PREMIUM Bulaj Szyba Przeźroczysta": { "style": ["nowoczesny", "minimalistyczny"] },
+    "PORTA VECTOR PREMIUM Bulaj Szyba Ryflowana": { "style": ["nowoczesny", "minimalistyczny"] },
+    "PORTA VECTOR PREMIUM model J": { "style": ["nowoczesny", "loft"] },
+    "PORTA CPL model 1.1": { "style": ["nowoczesny"] },
     "PORTA VERTE HOME, model M.1": { "style": ["rustykalny"] },
     "PORTA VERTE HOME, model M.1, przezroczysta szyba": { "style": ["rustykalny"] },
     "PORTA VERTE HOME, model M.2": { "style": ["rustykalny"] },
