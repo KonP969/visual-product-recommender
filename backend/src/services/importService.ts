@@ -43,7 +43,7 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
   console.log(
     `[IMPORT] Parsed ${parsed.length} products` +
     (stoppedEarly ? ' (stopped at limit)' : ` (feed total: ${parsed.length})`) +
-    (dropped > 0 ? ` — odsiano ${dropped} nie-drzwi (klamki/akcesoria/ościeżnice)` : ''),
+    (dropped > 0 ? ` — odsiano ${dropped} nie-drzwi z feedu` : ''),
   )
 
   options.onParsed?.(feedTotal, products.length)

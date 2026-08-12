@@ -40,17 +40,17 @@ describe('isDoorProduct — odsiew nie-drzwi z feedu', () => {
     ['Klamki', false],
     ['Akcesoria', false],
     ['Ościeżnice', false],
+    ['Drzwi wejściowe do mieszkania', false],
+    ['Drzwi techniczne', false],
+    ['Drzwi przesuwne', false],
+    ['Drzwi składane', false],
   ])('kategoria "%s" → nie jest drzwiami', (cat, expected) => {
     expect(isDoorProduct(cat)).toBe(expected)
   })
 
   it.each([
     ['Drzwi wewnętrzne'],
-    ['Drzwi wejściowe do mieszkania'],
-    ['Drzwi techniczne'],
     ['Drzwi szklane'],
-    ['Drzwi przesuwne'],
-    ['Drzwi składane'],
     ['Porta Loft Steel'],
   ])('kategoria "%s" → drzwi', (cat) => {
     expect(isDoorProduct(cat)).toBe(true)

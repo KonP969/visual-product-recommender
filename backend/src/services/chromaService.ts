@@ -72,10 +72,21 @@ export function categorizeDoor(name: string): 'residential' | 'specialty' {
   return COMMERCIAL_DOOR_PATTERNS.some((p) => p.test(name)) ? 'specialty' : 'residential'
 }
 
-// Kategorie feedu, które nie są skrzydłem drzwiowym: klamki, wizjery, zawiasy,
-// ościeżnice. Bez tego trafiają do katalogu jako drzwi — bo categorizeDoor to
-// denylista i wszystko nierozpoznane domyślnie zostaje 'residential'.
-const NON_DOOR_CATEGORIES = new Set(['klamki', 'akcesoria', 'ościeżnice'])
+// Kategorie feedu, które NIE są drzwiami wewnętrznymi: klamki/akcesoria/
+// ościeżnice (to nie skrzydło drzwiowe) oraz — decyzja eksperta domenowego,
+// docs/otwarte-zadania.md §1 — drzwi wejściowe, techniczne, przesuwne i
+// składane (to skrzydła, ale nie do wnętrza mieszkania). Bez tego trafiają
+// do katalogu jako drzwi — bo categorizeDoor to denylista po NAZWIE i
+// wszystko nierozpoznane domyślnie zostaje 'residential'.
+const NON_DOOR_CATEGORIES = new Set([
+  'klamki',
+  'akcesoria',
+  'ościeżnice',
+  'drzwi wejściowe do mieszkania',
+  'drzwi techniczne',
+  'drzwi przesuwne',
+  'drzwi składane',
+])
 
 /**
  * Czy oferta z feedu jest drzwiami? Rozstrzyga `category_main`.
