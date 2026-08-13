@@ -66,6 +66,8 @@ const COMMERCIAL_DOOR_PATTERNS = [
   /granit\s*c\b/i,    // GRANIT C brand (external security doors)
   /extreme\s*rc/i,    // EXTREME RC (anti-burglary)
   /przeciwpoż/i,      // fire-rated doors
+  /steel\s*safe/i,    // STEEL SAFE brand (reinforced entrance doors, category_main empty in feed)
+  /przesuwny\s+bezości[eę]żnicow/i, // bezościeżnicowy sliding system (category_main empty in feed)
 ]
 
 export function categorizeDoor(name: string): 'residential' | 'specialty' {

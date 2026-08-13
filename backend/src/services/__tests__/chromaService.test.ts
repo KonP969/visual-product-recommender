@@ -30,6 +30,9 @@ describe('categorizeDoor', () => {
     ['Steel SOLID model 1', 'specialty'],
     ['GRANIT C wejściowe', 'specialty'],
     ['Drzwi przeciwpożarowe EI30', 'specialty'],
+    ['PORTA STEEL SAFE model D.1 - Biały Matt', 'specialty'],
+    ['PORTA, STEEL SAFE, Energy Protect D.1 - Antracyt', 'specialty'],
+    ['System przesuwny bezościeżnicowy - Skrzydło - Biały', 'specialty'],
   ])('categorizes "%s" as %s', (name, expected) => {
     expect(categorizeDoor(name)).toBe(expected)
   })

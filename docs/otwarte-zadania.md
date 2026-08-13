@@ -11,6 +11,16 @@ dla usuwanych kategorii były wyższe niż w tabeli poniżej (2548 wejściowe, 1
 techniczne, 89 przesuwne, 70 składane) — tabela poniżej zachowana jako historyczny
 zapis decyzji, nie jako dokładny licznik.
 
+**Dopisek 2026-08-13:** finalny przegląd wdrożenia znalazł 57 wariantów (8 modeli
+`PORTA STEEL SAFE` + `System przesuwny bezościeżnicowy`) z PUSTYM `category_main`
+w feedzie — reguła "brak kategorii = drzwi wewnętrzne" ich nie odsiewała, mimo że
+to drzwi wejściowe wzmacniane/przesuwne. Ekspert domenowy zdecydował: mają nie
+pojawiać się w wynikach. Naprawione przez rozszerzenie `COMMERCIAL_DOOR_PATTERNS`
+w `chromaService.ts` (`steel safe`, `bezościeżnicowy`) + jednorazowy backfill
+`backend/src/scripts/backfillCategory.ts` (przelicza `category` z nazwy dla już
+zaimportowanych rekordów — 57 rekordów `residential` → `specialty`, katalog
+6360 → 6360, bo to przekategoryzowanie, nie usunięcie). Modeli 522 → 513.
+
 **Problem:** feed Porty ma pole `category_main`, ale projekt czyta je wyłącznie po to,
 żeby odsiać klamki i ościeżnice (`isDoorProduct` w `backend/src/services/chromaService.ts`).
 Czy drzwi są wewnętrzne, zgaduje `categorizeDoor` z NAZWY — denylistą, więc wszystko
