@@ -19,6 +19,9 @@
     "PORTA VERTE HOME, model M.1, przezroczysta szyba": { "style": ["rustykalny"] },
     "PORTA VERTE HOME, model M.2": { "style": ["rustykalny"] },
     "PORTA VERTE HOME, model M.2, przezroczysta szyba": { "style": ["rustykalny"] },
-    "PORTA VERTE PREMIUM model E.4": { "has_glass": true }
+    "PORTA VERTE PREMIUM model E.4": { "has_glass": true },
+    "PORTA RESIST model B.1": { "has_glass": true },
+    "PORTA FOCUS PREMIUM model 4.A": { "has_glass": true },
+    "PORTA UNI KOLOR MODERN model 4.A": { "has_glass": true }
   }
 }

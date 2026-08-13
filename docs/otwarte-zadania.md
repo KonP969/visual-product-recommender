@@ -82,16 +82,13 @@ Propozycje wizji (137 z 580 modeli, dziś nieaktualne po czyszczeniu z §1) leż
 `scripts/vision_style_proposals.json` (lokalne, w `.gitignore`) — NIE traktować
 jako źródło prawdy, patrz "Czego NIE próbować ponownie" niżej.
 
-## 3. Szkło — resztki po naprawie kategorii
+## 3. Szkło — resztki po naprawie kategorii — WDROŻONE 2026-08-13
 
-Po usunięciu drzwi wejściowych zostają trzy modele wewnętrzne z `has_glass=false`,
-które szybę mają (dowód: nazwa pliku packshotu zawiera „czarna szyba"):
-
-- `PORTA RESIST model B.1` — 8 wariantów
-- `PORTA FOCUS PREMIUM model 4.A` — 2 warianty
-- `PORTA UNI KOLOR MODERN model 4.A` — 1 wariant
-
-Naprawa: trzy wpisy `{"has_glass": true}` w `docs/style-overrides.json` + `applyOverrides.ts`.
+Trzy wpisy `{"has_glass": true}` dodane do `docs/style-overrides.json` (`modele`) +
+`applyOverrides.ts`: `PORTA RESIST model B.1` (8 wariantów), `PORTA FOCUS PREMIUM
+model 4.A` (2 warianty), `PORTA UNI KOLOR MODERN model 4.A` (1 wariant) —
+11 rekordów zaktualizowanych, zweryfikowane przez API, idempotencja potwierdzona
+(drugi przebieg: 0 do zmiany).
 
 ## 4. Zgłoszenia z przeglądu A–I, wciąż otwarte
 
