@@ -123,7 +123,7 @@ const VARIANT_RULES: Array<[RegExp, ColorFamily]> = [
   [/wenge\s*white/i, 'light_wood'],
   [/wenge|heban/i, 'dark_wood'],
   [/biał|bialy/i, 'white'],
-  [/antracyt|grafit|popiel|szar|fiord|przykurzon/i, 'grey'],
+  [/antracyt|grafit|popiel|szar|fiord|przykurzon|szałwia|szalwia/i, 'grey'],
   [/kaszmir|beż|bez\b|piaskow|krem|wanili|oliwk/i, 'beige'],
   [/ciemn|brunatn|czekolad|bagienn|marone|mocca|tabak|tabacco|hawana|szkarłatn/i, 'dark_wood'],
   [/orzech/i, 'medium_wood'],

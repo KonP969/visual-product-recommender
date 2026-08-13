@@ -30,9 +30,29 @@ describe('classifyDoor — color from variant', () => {
     ['PORTA X - Wenge White', 'light_wood'],
     ['PORTA X - Mocca', 'dark_wood'],
     ['PORTA X - Dąb Winchester', 'medium_wood'],
+    ['PORTA X - Szałwia', 'grey'],
     ['PORTA X - Farba proszkowana', 'unknown'],
   ])('%s → %s', (name, expected) => {
     expect(classifyDoor(name).colorFamily).toBe(expected)
+  })
+
+  // Bug: "PORTA GRANDE ... z czarną szybą - Szałwia" i "... Czarne Intarsje - Szałwia"
+  // (8 wariantów w katalogu) lądowały jako 'black', bo "Szałwia" nie miała reguły
+  // wariantu i klasyfikacja spadała na opis, gdzie wygrywało słowo "black" opisujące
+  // AKCENT (szybę/intarsje), nie kolor płyciny. Wariant musi wygrywać z opisem.
+  it('kolor wariantu wygrywa, nawet gdy opis wspomina akcent w innym kolorze', () => {
+    expect(
+      classifyDoor(
+        'PORTA GRANDE model G.1 z czarną szybą - Szałwia',
+        'Sage green residential interior door with black glass insert, sage lacquered panel, modern minimalist style.',
+      ).colorFamily,
+    ).toBe('grey')
+    expect(
+      classifyDoor(
+        'PORTA DESIRE model 4 Czarne Intarsje - Szałwia',
+        'Sage green residential interior door with black inlays, sage lacquered panel, modern minimalist style.',
+      ).colorFamily,
+    ).toBe('grey')
   })
 })
 
