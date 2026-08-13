@@ -65,6 +65,7 @@ describe('isDoorProduct — odsiew nie-drzwi z feedu', () => {
   it('nie jest wrażliwa na wielkość liter i białe znaki', () => {
     expect(isDoorProduct('  klamki  ')).toBe(false)
     expect(isDoorProduct('AKCESORIA')).toBe(false)
+    expect(isDoorProduct('  Drzwi Techniczne  ')).toBe(false)
   })
 })
 

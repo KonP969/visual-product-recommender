@@ -1,7 +1,12 @@
-// Usuwa z katalogu oferty, które nie są drzwiami: klamki, wizjery, zawiasy,
-// nakładki, ościeżnice. Trafiły tam, bo feedParser gubił <category_main>,
-// a categorizeDoor to denylista — wszystko nierozpoznane zostawało 'residential'.
-// Oba źródła są już naprawione; ten skrypt sprząta dane sprzed poprawki.
+// Usuwa z katalogu oferty z kategorii feedu, które NIE są drzwiami wewnętrznymi:
+// klamki/akcesoria/ościeżnice (to nie skrzydło drzwiowe) oraz — decyzja
+// eksperta domenowego, docs/otwarte-zadania.md §1 — drzwi wejściowe, techniczne,
+// przesuwne i składane (to skrzydła, ale nie do wnętrza mieszkania). Trafiły do
+// katalogu, bo categorizeDoor to denylista po NAZWIE — wszystko nierozpoznane
+// domyślnie zostaje 'residential'. Ten skrypt sprząta dane zaimportowane przed
+// rozszerzeniem `NON_DOOR_CATEGORIES` (w praktyce: 4513 rekordów w ostatnim
+// przebiegu, z czego zdecydowana większość to właśnie drzwi wejściowe/techniczne/
+// przesuwne/składane, nie klamki czy akcesoria).
 //
 // Bezpieczny i idempotentny: kasuje WYŁĄCZNIE id, które feed jawnie oznacza
 // kategorią nie-drzwiową. Brak kategorii = drzwi (patrz isDoorProduct).

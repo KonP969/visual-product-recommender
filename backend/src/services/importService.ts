@@ -32,9 +32,10 @@ export async function runImport(source: string, options: ImportOptions = {}): Pr
     onProgress: options.onParseProgress,
   })
 
-  // Feed miesza z drzwiami klamki, wizjery i ościeżnice. Bez tego odsiewu
-  // wchodzą do katalogu jako drzwi (categorizeDoor to denylista) i wypływają
-  // w wynikach wyszukiwania.
+  // Feed miesza z drzwiami wewnętrznymi klamki, wizjery i ościeżnice, a także
+  // drzwi wejściowe/techniczne/przesuwne/składane (nie do wnętrza mieszkania).
+  // Bez tego odsiewu wchodzą do katalogu jako drzwi (categorizeDoor to
+  // denylista) i wypływają w wynikach wyszukiwania.
   const products = parsed.filter((p) => isDoorProduct(p.categoryMain))
   const dropped = parsed.length - products.length
 

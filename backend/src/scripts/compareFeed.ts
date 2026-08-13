@@ -3,15 +3,17 @@
 // Uruchomienie: cd backend && npx ts-node --transpile-only src/scripts/compareFeed.ts
 import { ChromaClient } from 'chromadb'
 import { parseFeedStreaming } from '../services/feedParser'
+import { isDoorProduct } from '../services/chromaService'
 
 const FEED_URL = process.env.FEED_URL ?? 'https://www.porta.com.pl/product-feed.xml'
 
 async function main() {
   console.log(`Pobieram feed: ${FEED_URL}`)
-  const { products } = await parseFeedStreaming(FEED_URL, {
+  const { products: parsed } = await parseFeedStreaming(FEED_URL, {
     onProgress: (n) => process.stdout.write(`\r  sparsowano ${n}`),
   })
-  console.log(`\nFeed: ${products.length} produktów`)
+  const products = parsed.filter((p) => isDoorProduct(p.categoryMain))
+  console.log(`\nFeed: ${products.length} produktów (drzwi; odsiano ${parsed.length - products.length} nie-drzwi)`)
   const feedIds = new Set(products.map((p) => p.id))
 
   const client = new ChromaClient({ path: 'http://localhost:8000' })

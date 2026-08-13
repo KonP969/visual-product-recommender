@@ -25,9 +25,11 @@ async function main() {
       if (n % 2000 === 0) console.log(`[SYNC] parsowanie: ${n}`)
     },
   })
-  // Odsiew klamek, wizjerów i ościeżnic. Skutek uboczny jest zamierzony:
-  // skoro nie trafiają do feedById, krok 1 usunie z bazy te zaimportowane
-  // wcześniej — czyszczenie katalogu jedzie tą samą ścieżką co wycofania.
+  // Odsiew klamek/wizjerów/ościeżnic oraz drzwi wejściowych/technicznych/
+  // przesuwnych/składanych (nie do wnętrza mieszkania). Skutek uboczny jest
+  // zamierzony: skoro nie trafiają do feedById, krok 1 usunie z bazy te
+  // zaimportowane wcześniej — czyszczenie katalogu jedzie tą samą ścieżką co
+  // wycofania.
   const products = parsed.filter((p) => isDoorProduct(p.categoryMain))
   const dropped = parsed.length - products.length
   console.log(`[SYNC] Feed: ${products.length} drzwi (odsiano ${dropped} nie-drzwi z ${parsed.length})`)

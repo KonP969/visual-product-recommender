@@ -3,7 +3,13 @@
 Lista tego, co zostało do naprawy, z decyzjami eksperta domenowego i wskazaniem,
 gdzie szukać. Cel: domknąć w jednej sesji.
 
-## 1. Kategorie drzwi — DECYZJA PODJĘTA, do wdrożenia
+## 1. Kategorie drzwi — WDROŻONE
+
+**Zaimplementowano 2026-08-12** (plan `docs/superpowers/plans/2026-08-12-feed-door-categories.md`):
+katalog 10873 → 6360 rekordów, 580 → 522 modeli. Rzeczywiste liczby ofert w feedzie
+dla usuwanych kategorii były wyższe niż w tabeli poniżej (2548 wejściowe, 1806
+techniczne, 89 przesuwne, 70 składane) — tabela poniżej zachowana jako historyczny
+zapis decyzji, nie jako dokładny licznik.
 
 **Problem:** feed Porty ma pole `category_main`, ale projekt czyta je wyłącznie po to,
 żeby odsiać klamki i ościeżnice (`isDoorProduct` w `backend/src/services/chromaService.ts`).
@@ -36,6 +42,11 @@ model intarsje 6). Wizja widziała skandynawski w **137 z 580 modeli**. Reguły 
 `classifyStyles` (`backend/src/services/attributeService.ts`) praktycznie nigdy go nie
 przyznają. Ekspert domenowy wybrał poprawę reguł, nie tabelę korekt — ma działać automatycznie
 na cały katalog.
+
+**Uwaga po §1:** po przeprowadzonym powyżej czyszczeniu katalog ma 522 modele (nie 580),
+a `skandynawski` spadł do **1 wariantu** — jeden z oryginalnych 2 był drzwiami wejściowymi
+usuniętymi w §1. Kto weźmie się za ten punkt, powinien przeliczyć bazę od nowa, nie
+opierać się na liczbach z tej sesji.
 
 Sygnał do wychwycenia: jasne drewno PLUS prostota, nie samo „light coloured" — ta granica
 jest już opisana w prompcie wizji w `backend/src/scripts/visionStylePass.ts`.
