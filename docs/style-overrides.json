@@ -7,9 +7,7 @@
     "PORTA OSLO": { "style": ["rustykalny"] },
     "NATURA OSLO": { "style": ["rustykalny"] },
     "PORTA VECTOR PREMIUM": { "style": ["rustykalny"] },
-    "NATURA VECTOR": { "style": ["rustykalny"] },
-    "System przesuwny BLACK": { "style": ["rustykalny"] },
-    "System Przesuwny BLACK": { "style": ["rustykalny"] }
+    "NATURA VECTOR": { "style": ["rustykalny"] }
   },
   "modele": {
     "PORTA VECTOR PREMIUM Bulaj Szyba Matowa": { "style": ["nowoczesny", "minimalistyczny"] },
