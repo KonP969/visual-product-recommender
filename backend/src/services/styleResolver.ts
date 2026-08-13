@@ -4,7 +4,7 @@
 // już leżących w bazie, i zapisujemy identyczne flagi całej rodzinie.
 import { ChromaClient } from 'chromadb'
 import { aggregateStyles, classifyStyles, styleFlags } from './attributeService'
-import type { Style } from './attributeService'
+import type { ColorFamily, Style } from './attributeService'
 import { categorizeDoor } from './chromaService'
 import { modelOf } from './glassResolver'
 import { overrideFor } from './overrides'
@@ -28,9 +28,14 @@ export interface WynikStylu {
  * Model, którego WSZYSTKIE warianty nie mają opisu, nadal wypada jako
  * style_none — to jest poprawny wynik, nie awaria.
  */
-export function stylesForModel(descriptions: string[]): Style[] {
-  const niepuste = descriptions.filter((d) => d.trim())
-  return aggregateStyles(niepuste.map((d) => classifyStyles(d)))
+export function stylesForModel(
+  descriptions: string[],
+  colorFamilies: Array<ColorFamily | null | undefined> = [],
+): Style[] {
+  const pary = descriptions
+    .map((d, i) => ({ d, c: colorFamilies[i] }))
+    .filter(({ d }) => d.trim())
+  return aggregateStyles(pary.map(({ d, c }) => classifyStyles(d, c)))
 }
 
 /**
@@ -38,10 +43,14 @@ export function stylesForModel(descriptions: string[]): Style[] {
  * ekspert domenowy widzi drzwi, których opis EN nie oddaje (VIGO/CRAFT/VALLO
  * to wizualnie deski, a opis mówi "modern flat panel").
  */
-export function stylesForModelName(modelName: string, descriptions: string[]): Style[] {
+export function stylesForModelName(
+  modelName: string,
+  descriptions: string[],
+  colorFamilies: Array<ColorFamily | null | undefined> = [],
+): Style[] {
   const korekta = overrideFor(modelName)
   if (korekta?.style !== undefined) return korekta.style
-  return stylesForModel(descriptions)
+  return stylesForModel(descriptions, colorFamilies)
 }
 
 export async function resolveStylesForProducts(
@@ -85,6 +94,7 @@ export async function resolveStylesForProducts(
       stylesForModelName(
         model,
         warianty.map((w) => String(w.meta.description ?? '')),
+        warianty.map((w) => w.meta.color_family as ColorFamily | undefined),
       ),
     )
     for (const w of warianty) {

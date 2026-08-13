@@ -62,8 +62,21 @@ const STYLE_SIGNALS: Array<[Style, RegExp]> = [
   ['glamour', /glamou?r|luxur|ornate|baroque|ozdobn/i],
 ]
 
-export function classifyStyles(description: string): Style[] {
-  return STYLE_SIGNALS.filter(([, re]) => re.test(description)).map(([s]) => s)
+// docs/otwarte-zadania.md §2: opisy Gemini prawie nigdy nie mówią wprost
+// "scandinavian"/"nordic" (stąd /scandinav|nordic/i wyżej prawie nigdy nie trafia).
+// Sygnał z prompta wizji (visionStylePass.ts): "pale wood AND deliberately light,
+// airy, simple — not merely light coloured". Jasne drewno = ta sama rodzina koloru
+// co reszta klasyfikacji (light_wood); świadoma prostota = to samo słowo co
+// minimalistyczny. Wymagamy OBU, żeby nie łapać każdych jasnych drzwi — sam kolor
+// bez prostoty (np. "warm elegant") to za mało.
+export function classifyStyles(description: string, colorFamily?: ColorFamily | null): Style[] {
+  const trafione = new Set<Style>(
+    STYLE_SIGNALS.filter(([, re]) => re.test(description)).map(([s]) => s),
+  )
+  if (colorFamily === 'light_wood' && trafione.has('minimalistyczny')) {
+    trafione.add('skandynawski')
+  }
+  return STYLES.filter((s) => trafione.has(s))
 }
 
 // Flagi boolean do metadanych Chromy (multi-label nie mieści się w skalarze).
@@ -296,7 +309,7 @@ export function classifyDoor(name: string, description: string = ''): DoorAttrib
   // skrzydło — dlatego bazy NIE klasyfikujemy po polsku, tylko z opisu EN).
   if (!colorFamily) colorFamily = classifyDescription(description)
 
-  const styles = classifyStyles(description)
+  const styles = classifyStyles(description, colorFamily)
 
   return {
     colorFamily: colorFamily ?? 'unknown',

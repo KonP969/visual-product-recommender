@@ -268,6 +268,45 @@ describe('classifyStyles — multi-label z opisu', () => {
   })
 })
 
+// docs/otwarte-zadania.md §2: opisy Gemini prawie nigdy nie mówią wprost
+// "scandinavian"/"nordic", więc /scandinav|nordic/i w STYLE_SIGNALS prawie nigdy
+// nie trafia (2 warianty w całym katalogu). Sygnał z prompta wizji
+// (visionStylePass.ts): "pale wood AND deliberately light, airy, simple — not
+// merely light coloured" → jasne drewno (color_family light_wood) PLUS świadoma
+// prostota (to samo słowo co minimalistyczny). Wymagamy obu, żeby NIE łapać
+// każdych jasnych drzwi (np. "warm elegant" bez "minimalist" nie kwalifikuje).
+describe('classifyStyles — skandynawski z koloru (light_wood + minimalistyczny)', () => {
+  it('jasne drewno + minimalistyczny → dokłada skandynawski', () => {
+    expect(classifyStyles('light oak wood grain modern flat panel minimalist door', 'light_wood')).toEqual([
+      'nowoczesny',
+      'minimalistyczny',
+      'skandynawski',
+    ])
+  })
+  it('jasne drewno BEZ minimalistyczny → sam kolor nie wystarcza', () => {
+    expect(classifyStyles('light oak wood grain modern flat panel warm elegant door', 'light_wood')).toEqual([
+      'nowoczesny',
+    ])
+  })
+  it('minimalistyczny BEZ jasnego drewna → nie dokłada skandynawski', () => {
+    expect(classifyStyles('black modern minimalist flat panel door', 'black')).toEqual([
+      'nowoczesny',
+      'minimalistyczny',
+    ])
+  })
+  it('brak informacji o kolorze (wywołanie bez drugiego argumentu) → zachowanie bez zmian', () => {
+    expect(classifyStyles('light oak wood grain modern flat panel minimalist door')).toEqual([
+      'nowoczesny',
+      'minimalistyczny',
+    ])
+  })
+  it('kolejność wyniku zostaje zgodna z STYLES, nawet gdy skandynawski dochodzi z koloru', () => {
+    expect(
+      classifyStyles('light oak classic raised panel minimalist ornate glamour door', 'light_wood'),
+    ).toEqual(['klasyczny', 'minimalistyczny', 'skandynawski', 'glamour'])
+  })
+})
+
 describe('styleFlags', () => {
   it('ustawia flagi obecnych stylów + style_none=false', () => {
     const f = styleFlags(['klasyczny', 'loft'])

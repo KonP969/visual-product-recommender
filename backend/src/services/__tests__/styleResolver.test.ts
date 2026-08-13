@@ -59,6 +59,26 @@ describe('stylesForModel — opisy wariantów modelu → styl modelu', () => {
   it('model, którego WSZYSTKIE warianty nie mają opisu → style_none (pusty wynik), nie awaria', () => {
     expect(stylesForModel(['', '  ', ''])).toEqual([])
   })
+
+  // docs/otwarte-zadania.md §2: skandynawski dochodzi z pary (opis, color_family)
+  // per wariant — colorFamilies to równoległa tablica, po jednej wartości na opis.
+  it('kolor wariantów wpływa na głosowanie — jasne drewno + minimalistyczny daje skandynawski', () => {
+    const opisy = [
+      'modern minimalist flat panel residential interior door',
+      'modern minimalist flat panel residential interior door',
+      'modern residential interior door',
+    ]
+    const kolory: Array<'light_wood' | 'grey'> = ['light_wood', 'light_wood', 'grey']
+    expect(stylesForModel(opisy, kolory)).toEqual(['nowoczesny', 'minimalistyczny', 'skandynawski'])
+  })
+
+  it('bez tablicy kolorów (stare wywołanie) skandynawski z koloru nie dochodzi', () => {
+    const opisy = [
+      'modern minimalist flat panel residential interior door',
+      'modern minimalist flat panel residential interior door',
+    ]
+    expect(stylesForModel(opisy)).toEqual(['nowoczesny', 'minimalistyczny'])
+  })
 })
 
 describe('stylesForModelName — korekta przebija głosowanie', () => {

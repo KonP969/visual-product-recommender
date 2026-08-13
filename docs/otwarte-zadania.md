@@ -45,23 +45,42 @@ rozwiązuje się przy okazji. Kategorie robić PRZED korektą szkła.
 `System przesuwny BLACK` i `System Przesuwny BLACK` w `docs/style-overrides.json`
 staną się martwe — usunąć je.
 
-## 2. Skandynawski — DECYZJA: poprawić klasyfikator
+## 2. Skandynawski — PRÓBA PODJĘTA 2026-08-13, architektonicznie nierozwiązywalne bez zmiany modelu danych
 
-W całej bazie **2 warianty w 2 modelach** (PORTA FACTOR model 3, PORTA EXTREME RC 3
-model intarsje 6). Wizja widziała skandynawski w **137 z 580 modeli**. Reguły w
-`classifyStyles` (`backend/src/services/attributeService.ts`) praktycznie nigdy go nie
-przyznają. Ekspert domenowy wybrał poprawę reguł, nie tabelę korekt — ma działać automatycznie
-na cały katalog.
+**Diagnoza:** styl w tym projekcie to cecha CAŁEGO MODELU (identyczna flaga na
+wszystkich wariantach kolorystycznych) — liczona głosowaniem większościowym po
+opisach wariantów (`aggregateStyles` w `attributeService.ts`), a
+`checkStyleConsistency.ts` twardo pilnuje, że żaden model nie ma rozjechanych flag
+między wariantami. Skandynawskość zależy jednak od KONKRETNEGO KOLORU wariantu
+("pale wood" — jasne drewno), nie od konstrukcji modelu (w przeciwieństwie do
+loftu/rustykalnego, które są niezależne od koloru). Większość modeli ma zarówno
+jasne, jak i ciemne wybarwienia, więc żaden pojedynczy wariant nigdy nie osiąga
+>50% głosów na poziomie modelu.
 
-**Uwaga po §1:** po przeprowadzonym powyżej czyszczeniu katalog ma 522 modele (nie 580),
-a `skandynawski` spadł do **1 wariantu** — jeden z oryginalnych 2 był drzwiami wejściowymi
-usuniętymi w §1. Kto weźmie się za ten punkt, powinien przeliczyć bazę od nowa, nie
-opierać się na liczbach z tej sesji.
+**Co zaimplementowano:** `classifyStyles(description, colorFamily)` w
+`attributeService.ts` dokłada `skandynawski`, gdy wariant ma jednocześnie
+`color_family: light_wood` I sygnał "minimalistyczny" w opisie — dokładnie granica
+z prompta wizji ("pale wood AND deliberately light, airy, simple — not merely
+light coloured"). Przewleczone przez `styleResolver.ts`
+(`stylesForModel`/`stylesForModelName` przyjmują teraz `colorFamilies` per
+wariant) i `backfillStyle.ts`. Pokryte testami w `attributeService.test.ts` i
+`styleResolver.test.ts`.
 
-Sygnał do wychwycenia: jasne drewno PLUS prostota, nie samo „light coloured" — ta granica
-jest już opisana w prompcie wizji w `backend/src/scripts/visionStylePass.ts`.
-Propozycje wizji leżą w `scripts/vision_style_proposals.json` (lokalne, w `.gitignore`)
-— dobra próbka do kalibracji reguł.
+**Efekt na żywym katalogu: 0 rekordów zmienionych.** Sprawdzone dwiema drogami —
+głosowanie większościowe (0 modeli osiąga próg) i alternatywa "choć jeden wariant
+pasuje → cały model" (dałoby 145 modeli / 2716 wariantów, ale oznaczałoby też
+CZARNE/ciemne warianty tych modeli jako skandynawskie — dokładnie ten sam błąd
+nadmiernej hojności, o który oskarżono wizję). **Decyzja eksperta domenowego:
+zostawić głosowanie większościowe bez zmian.** Reguła w kodzie jest poprawna i
+zadziała sama, jeśli kiedyś do katalogu trafi model przeważająco jasny i prosty —
+ale przy obecnym składzie katalogu nic nie zmienia. §2 uznajemy za zamknięte w
+obecnej architekturze; realne odblokowanie wymagałoby zerwania z zasadą "styl =
+jedna etykieta na cały model" konkretnie dla tego stylu (osobny temat, nie
+podjęty).
+
+Propozycje wizji (137 z 580 modeli, dziś nieaktualne po czyszczeniu z §1) leżą w
+`scripts/vision_style_proposals.json` (lokalne, w `.gitignore`) — NIE traktować
+jako źródło prawdy, patrz "Czego NIE próbować ponownie" niżej.
 
 ## 3. Szkło — resztki po naprawie kategorii
 

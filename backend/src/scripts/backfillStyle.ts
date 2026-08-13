@@ -4,6 +4,7 @@
 import 'dotenv/config'
 import { ChromaClient } from 'chromadb'
 import { styleFlags } from '../services/attributeService'
+import type { ColorFamily } from '../services/attributeService'
 import { modelOf } from '../services/glassResolver'
 import { stylesForModelName } from '../services/styleResolver'
 import { categorizeDoor } from '../services/chromaService'
@@ -48,7 +49,8 @@ async function main() {
     // Głosowanie z opisów + tabela korekt (korekta zastępuje wynik głosowania).
     // Filtrowanie pustych opisów siedzi w stylesForModel — patrz uzasadnienie tam.
     const opisy = warianty.map((w) => String(w.meta.description ?? ''))
-    const style = stylesForModelName(model, opisy)
+    const kolory = warianty.map((w) => w.meta.color_family as ColorFamily | undefined)
+    const style = stylesForModelName(model, opisy, kolory)
     const flags = styleFlags(style)
     const key = style.length ? style.join('+') : '(none)'
     byStyle[key] = (byStyle[key] ?? 0) + warianty.length
