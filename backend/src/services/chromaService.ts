@@ -119,6 +119,7 @@ export async function upsertProduct(
     metadatas: [metadata as unknown as Record<string, string>],
   })
   nameIndex = null // new product invalidates the name-search index
+  nameCounts = null
 }
 
 // Cosine similarity between two L2-normalized vectors
@@ -188,6 +189,24 @@ export function dedupeByName<T extends SearchResultItem & { embedding: number[] 
     ...c,
     variantCount: count.get(c.metadata.name)!,
     priceFrom: minPriceStr.get(c.metadata.name) ?? c.metadata.price,
+  }))
+}
+
+// docs/manual-review-checklist.md §F: "N wariantów do wyboru" na karcie mylił
+// użytkownika, bo dedupeByName liczy tylko duplikaty nazwy W PULI TEGO wyszukiwania
+// (garstka kandydatów podobieństwa), nie prawdziwą liczbę wariantów modelu w całym
+// katalogu — więc karta prawie nigdy nie zgadzała się z konfiguratorem. Ta funkcja
+// nadpisuje variantCount PO całym rankingu, prawdziwą liczbą z indeksu nazw
+// (getNameCounts, ten sam cache co przy wyszukiwaniu po nazwie) — dedupeByName
+// i jego testy zostają nietknięte, bo swojej roboty (wybór reprezentanta + cena
+// „od") nadal robią dobrze.
+export function applyTrueVariantCounts<T extends SearchResultItem>(
+  results: T[],
+  totalCounts: Map<string, number>,
+): T[] {
+  return results.map((r) => ({
+    ...r,
+    variantCount: totalCounts.get(r.metadata.name) ?? r.variantCount,
   }))
 }
 
@@ -313,9 +332,10 @@ export async function searchSimilar(
   const ranked = seed ? applySeededJitter(candidates, seed) : candidates
   const deduped = dedupeByName(ranked)
   const results = applyMMR(deduped, n)
+  const totalCounts = await getNameCounts()
 
   return {
-    results,
+    results: applyTrueVariantCounts(results, totalCounts),
     isLowSimilarity: topSimilarity < LOW_SIMILARITY_THRESHOLD,
     droppedFinish,
   }
@@ -375,6 +395,19 @@ async function getNameIndex(): Promise<Array<{ id: string; name: string }>> {
 
   nameIndex = index
   return index
+}
+
+// Prawdziwa liczba wystąpień nazwy w CAŁYM katalogu — patrz applyTrueVariantCounts.
+// Ten sam cykl życia co nameIndex (jedno źródło, jedna invalidacja przy upsercie).
+let nameCounts: Map<string, number> | null = null
+
+async function getNameCounts(): Promise<Map<string, number>> {
+  if (nameCounts) return nameCounts
+  const index = await getNameIndex()
+  const counts = new Map<string, number>()
+  for (const { name } of index) counts.set(name, (counts.get(name) ?? 0) + 1)
+  nameCounts = counts
+  return counts
 }
 
 export async function searchProductsByName(

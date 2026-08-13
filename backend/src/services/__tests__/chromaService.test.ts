@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   applyMMR,
+  applyTrueVariantCounts,
   buildWhere,
   categorizeDoor,
   dedupeByName,
@@ -172,6 +173,39 @@ describe('dedupeByName — zwijanie po nazwie', () => {
       item('b', 'A - x', '100', 0.89),
     ])
     expect(out[0].priceFrom).toBe('100')
+  })
+})
+
+// docs/manual-review-checklist.md §F: "N wariantów do wyboru" na karcie nie zgadzało
+// się z konfiguratorem — bo dedupeByName liczy tylko duplikaty W PULI TEGO
+// wyszukiwania, nie prawdziwą liczbę wariantów w całym katalogu. applyTrueVariantCounts
+// nadpisuje variantCount PO rankingu, prawdziwą liczbą z indeksu nazw.
+describe('applyTrueVariantCounts — prawdziwa liczba z całego katalogu, nie z puli', () => {
+  const wynik = (id: string, name: string, variantCount: number) => ({
+    id,
+    similarity: 0.9,
+    metadata: { name, price: '100', imageUrl: '' },
+    variantCount,
+    priceFrom: '100',
+  })
+
+  it('nadpisuje variantCount z puli (2) prawdziwą liczbą z katalogu (8)', () => {
+    const counts = new Map([['PORTA X model A.0 - Biały', 8]])
+    const [out] = applyTrueVariantCounts([wynik('a', 'PORTA X model A.0 - Biały', 2)], counts)
+    expect(out.variantCount).toBe(8)
+  })
+
+  it('nazwa nieobecna w indeksie (np. race z invalidacją) zostawia liczbę z puli', () => {
+    const counts = new Map([['INNA NAZWA', 5]])
+    const [out] = applyTrueVariantCounts([wynik('a', 'PORTA X model A.0 - Biały', 2)], counts)
+    expect(out.variantCount).toBe(2)
+  })
+
+  it('nie rusza innych pól wyniku', () => {
+    const counts = new Map([['PORTA X model A.0 - Biały', 8]])
+    const [out] = applyTrueVariantCounts([wynik('a', 'PORTA X model A.0 - Biały', 2)], counts)
+    expect(out.id).toBe('a')
+    expect(out.priceFrom).toBe('100')
   })
 })
 

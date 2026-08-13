@@ -108,15 +108,25 @@ Pełna checklista i dosłowne zgłoszenia: `docs/manual-review-checklist.md`.
   `backend/src/services/attributeService.ts` (dodano „szałwia” do reguły `grey`) +
   backfill `backend/src/scripts/backfillColorFamily.ts` (68 wariantów Szałwia w całym
   katalogu, nie tylko 8 złamanych — reszta była wcześniej `unknown`).
-- **B** — `bez przeszklenia`/`ze szkłem`/`pełne jasne drzwi` zweryfikowane jako poprawne
-  (zero/same przeszklone, `hasGlass` się zgadza). `pełne jasne drzwi` zwraca modele z
-  „intarsje” w NAZWIE (to nazwa linii produktowej, nie widoczne przeszklenie —
-  `hasGlass=false` na każdym), więc jeśli zgłoszenie miało na myśli dekoracyjne wstawki,
-  a nie szkło, to nadal osobna kwestia UX, nie sprawdzona dziś wprost. `drewno naturalne`
-  NIE przetestowane dziś wprost (przypadkowe kliknięcie w trakcie innego testu nie dało
-  jednoznacznego wyniku) — status nieznany, do sprawdzenia osobno.
-- **F** — liczba wariantów w konfiguratorze (na stronie porta.com.pl, poza tym repo) —
-  nie sprawdzone dziś, nadal otwarte.
+- **B** — NAPRAWIONE/potwierdzone 2026-08-13. `bez przeszklenia`/`ze szkłem`/`pełne
+  jasne drzwi` zweryfikowane jako poprawne (zero/same przeszklone, `hasGlass` się
+  zgadza — "pełne" w tym systemie znaczy wyłącznie `has_glass: false`,
+  `geminiService.ts` linia 47). `pełne jasne drzwi` zwraca modele z „intarsje” w
+  NAZWIE, ale to nazwa linii produktowej (dekoracyjne wstawki w drewnie), nie
+  przeszklenie — `hasGlass=false` na każdym, więc to NIE jest błąd, tylko inna
+  interpretacja słowa „pełne” niż zakładało zgłoszenie z lipca. `drewno naturalne`
+  przetestowane osobno (świeże zapytanie przez API): zwraca czysto `light_wood`/
+  `medium_wood`, chip w UI poprawnie się podświetla i zmienia wynik z szarego na
+  drewniany. Oba naprawione wcześniej (prawdopodobnie guard
+  `explicitWoodFromQuery`), nikt tylko nie odhaczył wpisu.
+- **F** — NAPRAWIONE 2026-08-13. Przyczyna: `dedupeByName` liczył `variantCount`
+  tylko w puli kandydatów TEGO wyszukiwania (garstka trafień podobieństwa), nie w
+  całym katalogu — karta prawie nigdy nie mogła się zgadzać z konfiguratorem na
+  porta.com.pl. Naprawa: `applyTrueVariantCounts` w `chromaService.ts` nadpisuje
+  `variantCount` PO całym rankingu prawdziwą liczbą z istniejącego indeksu nazw
+  (`getNameCounts`, ten sam cache co wyszukiwanie po nazwie). `dedupeByName` i jego
+  6 testów nietknięte — nadal robią swoje (wybór reprezentanta + cena „od").
+  Pokryte 3 nowymi testami, zweryfikowane na żywym API.
 - **UI** — scroll lewego panelu / kolejność cena-„od” / zbędny link konfiguratora —
   nie sprawdzone dziś, nadal otwarte.
 - **Nowe** — lazy load po 10 wynikach — nie zaimplementowane, nadal otwarte.
