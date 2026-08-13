@@ -78,15 +78,35 @@ Naprawa: trzy wpisy `{"has_glass": true}` w `docs/style-overrides.json` + `apply
 
 Pełna checklista i dosłowne zgłoszenia: `docs/manual-review-checklist.md`.
 
-- **A** — `drzwi dębowe` pokazuje białe; `ciemny orzech` gubi kolor (Dąb Matowy Ciemny,
-  Mocca, Hikora, Dąb Hawana zamiast orzecha)
-- **B** — `drewno naturalne` wraca do widoku domyślnego, jakby chip nie był zaznaczony;
-  `pełne jasne drzwi` wpuszcza drzwi z intarsjami
-- **F** — liczba wariantów w konfiguratorze („N wariantów") nie zgadza się
-- **UI** — lewy panel nie scrolluje się pod kursorem (scrolluje środek, dopiero potem lewa
-  strona); kolejność „cena, potem od" zamiast „od, potem cena"; zbędny drugi link
-  ze słowem „konfigurator"
-- **Nowe** — do wyniku 10 doładowywać kolejne przez lazy load
+**Dopisek 2026-08-13 — pełne przejście A–I (Playwright + API):**
+
+- **A** — `drzwi dębowe` i `ciemny orzech` NIE reprodukują się już (obecnie: czysto
+  dąb / czysto ciemny orzech, z odpowiednimi `color_family`). Naprawione w
+  międzyczasie (guard `explicitFinishFromQuery`/`explicitWoodFromQuery` w
+  `backend/src/routes/search.ts`), ale ten wpis nigdy nie został odhaczony — poprawiono
+  teraz. **Nowy bug tej samej rodziny, znaleziony i naprawiony dziś:** 8 wariantów
+  (`PORTA GRANDE ... z czarną szybą` / `PORTA DESIRE ... Czarne Intarsje`, oba w kolorze
+  Szałwia) miało `color_family: black` — zapytanie `drzwi czarne` zwracało zielone
+  drzwi. Przyczyna: „Szałwia” nie miała reguły wariantu, klasyfikacja spadała na opis
+  Gemini, gdzie słowo „black” (opisujące akcent, nie płycinę) wygrywało. Naprawa:
+  `backend/src/services/attributeService.ts` (dodano „szałwia” do reguły `grey`) +
+  backfill `backend/src/scripts/backfillColorFamily.ts` (68 wariantów Szałwia w całym
+  katalogu, nie tylko 8 złamanych — reszta była wcześniej `unknown`).
+- **B** — `bez przeszklenia`/`ze szkłem`/`pełne jasne drzwi` zweryfikowane jako poprawne
+  (zero/same przeszklone, `hasGlass` się zgadza). `pełne jasne drzwi` zwraca modele z
+  „intarsje” w NAZWIE (to nazwa linii produktowej, nie widoczne przeszklenie —
+  `hasGlass=false` na każdym), więc jeśli zgłoszenie miało na myśli dekoracyjne wstawki,
+  a nie szkło, to nadal osobna kwestia UX, nie sprawdzona dziś wprost. `drewno naturalne`
+  NIE przetestowane dziś wprost (przypadkowe kliknięcie w trakcie innego testu nie dało
+  jednoznacznego wyniku) — status nieznany, do sprawdzenia osobno.
+- **F** — liczba wariantów w konfiguratorze (na stronie porta.com.pl, poza tym repo) —
+  nie sprawdzone dziś, nadal otwarte.
+- **UI** — scroll lewego panelu / kolejność cena-„od” / zbędny link konfiguratora —
+  nie sprawdzone dziś, nadal otwarte.
+- **Nowe** — lazy load po 10 wynikach — nie zaimplementowane, nadal otwarte.
+
+Reszta (D, C, E, G, H, I) zweryfikowana dziś jako działająca poprawnie — patrz transkrypt
+sesji 2026-08-13, nie zapisane tu osobno bo nie są to zgłoszenia tylko potwierdzenia.
 
 ## 5. Backlog techniczny z wcześniejszych sesji
 
