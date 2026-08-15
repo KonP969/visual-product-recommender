@@ -75,7 +75,7 @@ export function SearchResults({
       <div className="flex flex-col items-start gap-3 py-20 pl-1">
         <PackageSearch className="h-7 w-7 text-ink-soft" />
         <p className="text-[15px] text-ink-soft">
-          Katalog jest pusty. Zaimportuj feed produktowy, aby zacząć.
+          {searchResult?.notice ?? 'Katalog jest pusty. Zaimportuj feed produktowy, aby zacząć.'}
         </p>
       </div>
     )

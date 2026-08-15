@@ -40,13 +40,16 @@ export function useSearch(): UseSearchReturn {
   const productsRef = useRef<SearchResult['products']>([])
 
   const applyResult = useCallback((result: SearchResult) => {
+    // Zawsze zapisz wynik — nawet pusty. `notice`/`styleCounts` tłumaczą userowi,
+    // DLACZEGO nic nie znaleziono (np. "brak drzwi w tym stylu"), a to właśnie
+    // wtedy, gdy pusto, ten komunikat jest najbardziej potrzebny.
+    productsRef.current = result.products
+    setSearchResult(result)
     if (result.products.length === 0) {
       setAppState('empty-catalog')
       setHasMore(false)
       return
     }
-    productsRef.current = result.products
-    setSearchResult(result)
     setAppState(result.status === 'low-similarity' ? 'low-similarity' : 'success')
     setHasMore(result.products.length >= PAGE_SIZE)
   }, [])

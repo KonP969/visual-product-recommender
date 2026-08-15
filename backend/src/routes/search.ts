@@ -288,14 +288,17 @@ searchRouter.post('/search-text', async (req, res) => {
       console.log(`[SEARCH-TEXT] Guard: wymuszono wybarwienie ${finish}`)
     }
 
-    // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard z tekstu.
+    // Styl: jawne pole z chipa (frontend) przebija tekst; brak → guard ze SŁÓW
+    // UŻYTKOWNIKA (guardText), nie z całego query — inaczej odklikanie chipa
+    // stylu (bodyStyle=null) potrafiło go przywrócić z zamrożonej bazy, gdy ta
+    // akurat wspominała jakiś styl ("klasyczne, eleganckie drzwi...").
     // body.style pochodzi z publicznego endpointu — waliduj wobec STYLES.
     const rawStyle = req.body?.style
     const bodyStyle =
       typeof rawStyle === 'string' && (STYLES as readonly string[]).includes(rawStyle)
         ? (rawStyle as Style)
         : null
-    const style = bodyStyle ?? explicitStyleFromQuery(query)
+    const style = bodyStyle ?? explicitStyleFromQuery(guardText)
     if (style) {
       description.filters = { ...description.filters, style }
       console.log(`[SEARCH-TEXT] Guard: wymuszono styl ${style}`)

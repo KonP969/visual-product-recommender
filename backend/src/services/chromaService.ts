@@ -309,8 +309,16 @@ export async function searchSimilar(
   // nigdy nie dopełniamy produktami łamiącymi ograniczenia użytkownika.
   let candidates = await queryCandidates(embedding, candidateN, buildWhere(filters))
 
-  // Awaryjnie (dane sprzed backfillu kategorii): tylko gdy nie było filtrów.
-  if (candidates.length === 0 && !filters?.colors && filters?.glass == null && filters?.style == null) {
+  // Awaryjnie (dane sprzed backfillu kategorii): tylko gdy NAPRAWDĘ nie było
+  // żadnych twardych filtrów — inaczej ta ścieżka pomija np. filtr wybarwienia
+  // (finish tu brakowało) i zwraca produkty łamiące ograniczenie użytkownika.
+  if (
+    candidates.length === 0 &&
+    !filters?.colors &&
+    filters?.glass == null &&
+    filters?.style == null &&
+    !filters?.finish
+  ) {
     const all = await queryCandidates(embedding, candidateN)
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
   }

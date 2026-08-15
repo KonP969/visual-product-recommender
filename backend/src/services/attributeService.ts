@@ -105,7 +105,7 @@ export function aggregateStyles(perVariant: Style[][]): Style[] {
   // Iterujemy po STYLES, żeby kolejność wyniku była kanoniczna (stabilne testy
   // i stabilne metadane), niezależna od kolejności wstawiania do mapy.
   const większość = STYLES.filter((s) => (głosy.get(s) ?? 0) * 2 > perVariant.length)
-  if (większość.length > 0) return [...większość]
+  if (większość.length > 0) return większość
 
   const max = Math.max(...głosy.values())
   return STYLES.filter((s) => (głosy.get(s) ?? 0) === max)

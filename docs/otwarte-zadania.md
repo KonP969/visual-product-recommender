@@ -152,13 +152,29 @@ Pełna checklista i dosłowne zgłoszenia: `docs/manual-review-checklist.md`.
 Reszta (D, C, E, G, H, I) zweryfikowana dziś jako działająca poprawnie — patrz transkrypt
 sesji 2026-08-13, nie zapisane tu osobno bo nie są to zgłoszenia tylko potwierdzenia.
 
-## 5. Backlog techniczny z wcześniejszych sesji
+## 5. Backlog techniczny z wcześniejszych sesji — ZAMKNIĘTE 2026-08-15
 
-- `useSearch.ts` gubi `notice` i `styleCounts`, gdy lista produktów jest pusta — czyli
-  dokładnie wtedy, gdy komunikat jest najbardziej potrzebny
-- fallback w `searchSimilar` nie stosuje filtrów
-- przy odklikaniu chipa stylu tekst z bazy może przywrócić styl przez guard
-- redundantny spread `[...większość]` w `attributeService.ts`
+- `useSearch.ts` gubił `notice`/`styleCounts` przy pustych wynikach — `applyResult`
+  teraz zawsze zapisuje `searchResult` (nie tylko gdy `products.length > 0`),
+  a `SearchResults.tsx` pokazuje `notice` zamiast sztywnego tekstu, gdy jest
+  obecny. Rail dostaje świeże `styleCounts` nawet przy zerowym wyniku.
+- fallback w `searchSimilar` (dane sprzed backfillu kategorii) pomijał filtr
+  `finish` — strażnik teraz sprawdza też `!filters?.finish`, więc ścieżka
+  awaryjna uruchamia się TYLKO gdy naprawdę nie ma żadnego twardego filtra.
+- guard stylu w `/search-text` skanował CAŁE `query` (łącznie z zamrożoną bazą)
+  zamiast `guardText` (słowa użytkownika) jak pozostałe 3 guardy (kolor/drewno/
+  wybarwienie) — odklikanie jedynego stylu przy bazie wspominającej styl mogło
+  go przywrócić. Naprawione: `explicitStyleFromQuery(guardText)`. Nota: nadal
+  zostaje węższy przypadek brzegowy — gdy user zdejmie OSTATNI krok
+  doprecyzowania (kroki=[]), `guardText` samo spada do `query` (tak działają
+  też pozostałe 3 guardy, to nie jest specyficzne dla stylu) — to już zmiana
+  architektury guardów, nie jednolinijkowa poprawka, świadomie poza zakresem.
+- `[...większość]` w `aggregateStyles` (`attributeService.ts`) — `większość` to
+  już nowa tablica z `.filter()`, spread był zbędną kopią. Usunięty.
+
+Zweryfikowane: 214 testów backendu + 43 frontendu, `tsc` czysty, build zielony,
+guard stylu potwierdzony na żywo (nie loguje wymuszenia, gdy `guardText` nie
+zawiera słowa stylu).
 
 ## Czego NIE próbować ponownie
 
