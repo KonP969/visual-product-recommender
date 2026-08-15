@@ -8,6 +8,9 @@ interface SearchResultsProps {
   searchStage: SearchStage
   searchResult: SearchResult | null
   errorMessage?: string | null
+  onLoadMore?: () => void
+  loadingMore?: boolean
+  hasMore?: boolean
 }
 
 const STAGES: Array<{ key: SearchStage; label: string; icon: typeof Sparkles }> = [
@@ -47,6 +50,9 @@ export function SearchResults({
   searchStage,
   searchResult,
   errorMessage,
+  onLoadMore,
+  loadingMore,
+  hasMore,
 }: SearchResultsProps) {
   if (appState === 'idle') return null
 
@@ -106,6 +112,26 @@ export function SearchResults({
         </div>
       )}
       <ResultsGrid products={searchResult.products} />
+
+      {hasMore && onLoadMore && (
+        <div className="mt-8 flex justify-center">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="inline-flex items-center gap-2 rounded-full border border-ink-soft/25 px-5 py-2.5 text-sm text-ink transition-colors hover:border-brass hover:text-brass-deep disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Wczytuję…
+              </>
+            ) : (
+              'Pokaż więcej'
+            )}
+          </button>
+        </div>
+      )}
 
       {searchResult.wildcard && searchResult.wildcard.products.length > 0 && (
         <div className="mt-12 rounded-2xl border border-brass/25 bg-brass-soft/40 p-6">

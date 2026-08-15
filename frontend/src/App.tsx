@@ -20,7 +20,18 @@ const SAMPLES = [
 
 export default function App() {
   const { previewUrl, validationError, handleFile, reset: resetFile } = useFileUpload()
-  const { appState, searchStage, searchResult, errorMessage, search, refine, reset: resetSearch } = useSearch()
+  const {
+    appState,
+    searchStage,
+    searchResult,
+    errorMessage,
+    search,
+    refine,
+    reset: resetSearch,
+    loadMore,
+    loadingMore,
+    hasMore,
+  } = useSearch()
   const [showAdmin, setShowAdmin] = useState(false)
 
   const refinement = useRefinement()
@@ -140,6 +151,9 @@ export default function App() {
               searchStage={searchStage}
               searchResult={searchResult}
               errorMessage={errorMessage}
+              onLoadMore={loadMore}
+              loadingMore={loadingMore}
+              hasMore={hasMore}
             />
           </div>
         )}

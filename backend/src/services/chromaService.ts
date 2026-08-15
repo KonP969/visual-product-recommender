@@ -283,6 +283,8 @@ export async function searchSimilar(
   filters?: HardFilters,
   seed?: string,
   candidateMultiplier = 5,
+  /** "Doładuj kolejne": nazwy już pokazane userowi — wykluczone z tej strony wyników. */
+  excludeNames?: Set<string>,
 ): Promise<{
   results: SearchResultItem[]
   isLowSimilarity: boolean
@@ -298,8 +300,10 @@ export async function searchSimilar(
 
   // Fetch a larger candidate pool so MMR has room to diversify.
   // Wybarwienie odsiewa po nazwie już PO pobraniu, więc pula musi być większa.
+  // Doładowanie wyklucza nazwy już pokazane, więc pula rośnie o tyle, ile trzeba
+  // odsiać, inaczej po wykluczeniu mogłoby zabraknąć kandydatów dla MMR.
   const effMultiplier = filters?.finish ? candidateMultiplier * 8 : candidateMultiplier
-  const candidateN = Math.min(n * effMultiplier, count)
+  const candidateN = Math.min(n * effMultiplier + (excludeNames?.size ?? 0), count)
 
   // Twarde filtry są nienegocjowalne: gdy dają mniej wyników, zwracamy mniej —
   // nigdy nie dopełniamy produktami łamiącymi ograniczenia użytkownika.
@@ -309,6 +313,10 @@ export async function searchSimilar(
   if (candidates.length === 0 && !filters?.colors && filters?.glass == null && filters?.style == null) {
     const all = await queryCandidates(embedding, candidateN)
     candidates = all.filter((c) => categorizeDoor(c.metadata.name) === 'residential')
+  }
+
+  if (excludeNames && excludeNames.size > 0) {
+    candidates = candidates.filter((c) => !excludeNames.has(c.metadata.name))
   }
 
   // Gatunek wybarwienia: rodzina koloru go nie rozróżnia ("Dąb Ciemny" i

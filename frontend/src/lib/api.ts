@@ -61,12 +61,22 @@ async function consumeSearchStream(
   return result ? { data: result } : { error: 'Serwer zakończył odpowiedź bez wyniku' }
 }
 
+export interface SearchPagingOptions {
+  /** "Doładuj kolejne": nazwy już pokazanych produktów, żeby się nie powtórzyły */
+  excludeNames?: string[]
+  /** Ile nowych produktów zwrócić (domyślnie 10 po stronie backendu) */
+  n?: number
+}
+
 export async function searchByImage(
   file: File,
+  opts: SearchPagingOptions = {},
   handlers: SearchStreamHandlers = {},
 ): Promise<ApiResponse<SearchResult>> {
   const formData = new FormData()
   formData.append('image', file)
+  if (opts.excludeNames?.length) formData.append('excludeNames', JSON.stringify(opts.excludeNames))
+  if (opts.n) formData.append('n', String(opts.n))
 
   try {
     const response = await fetch(`${BASE_URL}/search`, {
@@ -81,14 +91,20 @@ export async function searchByImage(
 
 export async function searchByText(
   query: string,
-  opts: { style?: string | null; refinement?: string } = {},
+  opts: { style?: string | null; refinement?: string } & SearchPagingOptions = {},
   handlers: SearchStreamHandlers = {},
 ): Promise<ApiResponse<SearchResult>> {
   try {
     const response = await fetch(`${BASE_URL}/search-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, style: opts.style ?? null, refinement: opts.refinement ?? null }),
+      body: JSON.stringify({
+        query,
+        style: opts.style ?? null,
+        refinement: opts.refinement ?? null,
+        excludeNames: opts.excludeNames,
+        n: opts.n,
+      }),
     })
     return await consumeSearchStream(response, handlers)
   } catch {

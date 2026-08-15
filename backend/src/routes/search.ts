@@ -34,6 +34,29 @@ const upload = multer({
 
 export const searchRouter = Router()
 
+// "Doładuj kolejne": frontend wysyła nazwy już pokazanych produktów, żeby
+// kolejna strona wyników ich nie powtórzyła. Multipart (/search) wysyła to
+// jako JSON-string pola formularza; JSON (/search-text) — jako gotową tablicę.
+function parseExcludeNames(raw: unknown): Set<string> | undefined {
+  if (Array.isArray(raw)) {
+    const names = raw.filter((x): x is string => typeof x === 'string')
+    return names.length > 0 ? new Set(names) : undefined
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      return parseExcludeNames(JSON.parse(raw))
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+function parseResultCount(raw: unknown, fallback: number): number {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 100) : fallback
+}
+
 function toProducts(results: SearchResultItem[]) {
   return results.map((r) => ({
     id: r.id,
@@ -159,7 +182,16 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
     if (droppedStyle) {
       console.warn(`[SEARCH] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
     }
-    const { results, isLowSimilarity } = await searchSimilar(embedding, 10, filters, seed)
+    const excludeNames = parseExcludeNames(req.body?.excludeNames)
+    const n = parseResultCount(req.body?.n, 10)
+    const { results, isLowSimilarity } = await searchSimilar(
+      embedding,
+      n,
+      filters,
+      seed,
+      undefined,
+      excludeNames,
+    )
     console.log(`[SEARCH] Got ${results.length} results, isLowSimilarity=${isLowSimilarity}`)
 
     const payload = buildResultPayload(
@@ -173,8 +205,10 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
 
     // Odważna alternatywa projektanta: przychodzi w TYM SAMYM wywołaniu Gemini,
     // więc kosztuje tylko jeden embedding (sidecar) i jedno query do Chroma.
+    // Przy doładowaniu kolejnych (excludeNames) front już ją ma i nie renderuje
+    // ponownie — pomijamy, żeby nie płacić za policzenie czegoś niewidocznego.
     let wildcard: object | null = null
-    if (description?.wild && results.length > 0) {
+    if (!excludeNames && description?.wild && results.length > 0) {
       try {
         const wildEmbedding = await getTextEmbedding(description.wild.clipQuery)
         const seen = new Set(results.map((r) => r.id))
@@ -282,11 +316,15 @@ searchRouter.post('/search-text', async (req, res) => {
       console.warn(`[SEARCH-TEXT] Brak drzwi w stylu "${droppedStyle}" — pomijam filtr`)
     }
 
+    const excludeNames = parseExcludeNames(req.body?.excludeNames)
+    const n = parseResultCount(req.body?.n, 10)
     const { results, isLowSimilarity, droppedFinish } = await searchSimilar(
       embedding,
-      10,
+      n,
       filters,
       seed,
+      undefined,
+      excludeNames,
     )
 
     send({

@@ -127,9 +127,27 @@ Pełna checklista i dosłowne zgłoszenia: `docs/manual-review-checklist.md`.
   (`getNameCounts`, ten sam cache co wyszukiwanie po nazwie). `dedupeByName` i jego
   6 testów nietknięte — nadal robią swoje (wybór reprezentanta + cena „od").
   Pokryte 3 nowymi testami, zweryfikowane na żywym API.
-- **UI** — scroll lewego panelu / kolejność cena-„od” / zbędny link konfiguratora —
-  nie sprawdzone dziś, nadal otwarte.
-- **Nowe** — lazy load po 10 wynikach — nie zaimplementowane, nadal otwarte.
+- **UI** — ZAMKNIĘTE 2026-08-13. Kolejność „od, potem cena" i pojedynczy link
+  konfiguratora — już naprawione wcześniej (potwierdzone w kodzie i na żywo).
+  Scroll lewego panelu pod kursorem — odtworzony i zdiagnozowany: panel jest
+  `sticky` z własnym scrollem tylko gdy treść przekracza wysokość ekranu
+  (`Rail.tsx:92`); gdy się mieści, scroll trafia do strony, a panel (sticky)
+  wygląda na nieruchomy. To STANDARDOWY wzorzec sticky-sidebar (Amazon, Zalando
+  działają identycznie), nie defekt. Świadoma decyzja: zostawić bez zmian —
+  wymuszenie lokalnego scrolla dałoby martwą strefę, a osobne panele przewijania
+  to niepasujący do tego UI wzorzec dashboardowy.
+- **Nowe** — ZAIMPLEMENTOWANE 2026-08-15. Przycisk „Pokaż więcej" doładowuje
+  kolejne wyniki bez powtórzeń. Backend: `searchSimilar` przyjmuje
+  `excludeNames` (nazwy już pokazane, odsiewane z puli PRZED MMR — pula rośnie
+  o ich liczbę, żeby po odsianiu starczyło kandydatów) i `n` (rozmiar strony,
+  domyślnie 10) w `/search` i `/search-text`. Frontend (`useSearch.ts`)
+  powtarza OSTATNIE zapytanie (ten sam plik/tekst — trafia w cache Gemini,
+  więc tanie) z listą nazw do wykluczenia i dokleja wynik do istniejącej
+  listy zamiast ją zastępować; `hasMore` gaśnie, gdy strona zwróci mniej niż
+  `n` nowych. Sekcja „A gdyby tak zaszaleć" nie jest przeliczana przy
+  doładowaniu (front i tak jej ponownie nie renderuje). Zweryfikowane w
+  przeglądarce: 10 → 20 → 25 (przycisk poprawnie znika), zero duplikatów,
+  licznik nagłówka aktualny.
 
 Reszta (D, C, E, G, H, I) zweryfikowana dziś jako działająca poprawnie — patrz transkrypt
 sesji 2026-08-13, nie zapisane tu osobno bo nie są to zgłoszenia tylko potwierdzenia.
