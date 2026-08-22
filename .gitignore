@@ -32,3 +32,16 @@ backend/.cache/
 # Artefakty przeglądu stylu — propozycje wizji i galeria (odtwarzalne ze skryptów)
 scripts/vision_style_proposals.json
 scripts/style-review.html
+
+# Crash dumpy i pliki tymczasowe
+*.stackdump
+vite.config.ts.timestamp-*
+
+# Zbudowana wizytowka (generowana ze zrodla docs/case-study.html)
+docs/case-study.build.html
+
+# Historia sesji narzedzi AI i pliki robocze skryptow
+.specstory/
+.cursorindexingignore
+scripts/*_progress.json
+2026-*-zrbmy-projekt-*.txt
