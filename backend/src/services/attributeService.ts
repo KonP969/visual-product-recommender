@@ -132,6 +132,14 @@ export function explicitStyleFromQuery(query: string): Style | null {
 // Kolejność ma znaczenie: pierwsza pasująca reguła wygrywa.
 // Wariant polski (część nazwy po " - ") np. "Dąb Matowy Ciemny", "Czarny Struktura".
 const VARIANT_RULES: Array<[RegExp, ColorFamily]> = [
+  // Linia PORTA GLASS (czyste tafle szklane, bez wyboru koloru skrzydła) nazywa
+  // wariant typem SZYBY ("Szyba matowa", "Szyba grafitowa", "Szyba przezierna"),
+  // nie kolorem — a "matowa" w opisie Gemini ("white frosted") opisuje MLECZNOŚĆ
+  // szkła, nie skrzydło, więc fallback na opis dawał 'white'/'grey'. Naprawdę
+  // wszystkie 11 SKU tej linii mają czarną ramę i czarne okucia (potwierdzone w
+  // każdym imageUrl feedu: "..._czarny_okucia-czarny-.png") — reguła wariantu musi
+  // wygrać, zanim "grafitowa"/"matowa" złapie się na regułach koloru niżej.
+  [/^szyba\b/i, 'black'],
   [/czarn/i, 'black'],
   [/wenge\s*white/i, 'light_wood'],
   [/wenge|heban/i, 'dark_wood'],

@@ -1,12 +1,8 @@
-// Polska liczba mnoga ma trzy formy, a "nastki" są wyjątkiem: 4 warianty,
-// ale 14 wariantów. Zwijanie wariantów potrafi dać dowolną liczbę, więc
-// reguła musi być pełna, nie "do czterech".
-export function warianty(n: number): string {
-  const ostatnia = n % 10
-  const dwieOstatnie = n % 100
-  const forma =
-    ostatnia >= 2 && ostatnia <= 4 && !(dwieOstatnie >= 12 && dwieOstatnie <= 14)
-      ? 'warianty'
-      : 'wariantów'
-  return `${n} ${forma}`
+// Liczba wariantów na karcie liczy tylko te w TYM katalogu — a katalog bywa
+// niepełnym podzbiorem prawdziwej oferty na porta.com.pl (konfigurator
+// potrafi mieć wielokrotnie więcej kolorów niż zaimportowaliśmy z feedu).
+// Dokładna liczba więc czasem kłamie i nie zgadza się z konfiguratorem;
+// opisowe kubełki ("kilka"/"wiele") nie obiecują precyzji, której nie mamy.
+export function wariantyOpisowo(n: number): string {
+  return n >= 5 ? 'wiele wariantów' : 'kilka wariantów'
 }

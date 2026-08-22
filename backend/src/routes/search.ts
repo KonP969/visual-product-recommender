@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import { Router, Response } from 'express'
 import multer from 'multer'
 import { getEmbedding, getTextEmbedding } from '../services/clipService'
-import { searchSimilar, SearchResultItem } from '../services/chromaService'
+import { searchSimilar, SearchResultItem, HardFilters } from '../services/chromaService'
 import {
   describeRoomForDoorMatching,
   describeDoorFromText,
@@ -17,7 +17,7 @@ import {
   STYLES,
 } from '../services/attributeService'
 import type { Style } from '../services/attributeService'
-import { buildNotice, resolveStyleFilter } from './searchNotices'
+import { buildNotice, buildEmptyResultNotice, resolveStyleFilter } from './searchNotices'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -80,6 +80,7 @@ function buildResultPayload(
   droppedFinish?: string,
   droppedStyle?: Style,
   styleCounts?: Record<Style, number>,
+  filters?: HardFilters,
 ) {
   const notice = buildNotice(droppedFinish, droppedStyle)
   if (results.length === 0) {
@@ -88,7 +89,9 @@ function buildResultPayload(
       description: description?.clipQuery,
       displayDescription: description?.displayPl,
       status: 'empty-catalog' as const,
-      notice,
+      // Puste wyniki z twardego filtra (kolor/szkło/styl) ≠ pusty katalog —
+      // patrz komentarz przy buildEmptyResultNotice w searchNotices.ts.
+      notice: notice ?? buildEmptyResultNotice(filters),
       styleCounts,
     }
   }
@@ -201,6 +204,7 @@ searchRouter.post('/search', upload.single('image'), async (req, res) => {
       undefined,
       droppedStyle,
       styleCounts,
+      filters,
     )
 
     // Odważna alternatywa projektanta: przychodzi w TYM SAMYM wywołaniu Gemini,
@@ -339,6 +343,7 @@ searchRouter.post('/search-text', async (req, res) => {
         droppedFinish,
         droppedStyle,
         styleCounts,
+        filters,
       ),
     })
     await sendMatchReasons(send, description, results)

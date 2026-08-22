@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Product } from '@/types'
-import { warianty } from '@/lib/plural'
+import { wariantyOpisowo } from '@/lib/plural'
 
 interface ProductCardProps {
   product: Product
@@ -85,7 +85,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
       {maWarianty && (
         <p className="m-0 -mt-1 text-[11px] text-ink-soft/80">
-          {warianty(product.variantCount!)} do wyboru
+          {wariantyOpisowo(product.variantCount!)} do wyboru
         </p>
       )}
     </article>

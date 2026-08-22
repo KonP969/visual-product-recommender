@@ -17,7 +17,11 @@ export function Header() {
           Wizualny <em className="italic text-brass">Doradca</em> Drzwi
         </span>
         <span className="text-[11px] uppercase tracking-[0.08em] text-ink-soft">
-          {count !== null ? `Katalog Porta · ${count.toLocaleString('pl-PL')} modeli` : 'Katalog Porta'}
+          {/* `count` to liczba REKORDÓW w ChromaDB (wariant = model + kolor), nie modeli —
+              modeli jest ~513. Podpis musi się zgadzać z tym, co faktycznie liczymy. */}
+          {count !== null
+            ? `Katalog · ${count.toLocaleString('pl-PL')} produktów`
+            : 'Katalog'}
         </span>
       </div>
     </header>

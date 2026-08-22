@@ -6,7 +6,7 @@
 // zduplikowane słowo w słowo), żeby reguła miała jedno miejsce i własne testy.
 import { countStyles } from '../services/styleIndex'
 import type { HardFilters } from '../services/chromaService'
-import type { Style } from '../services/attributeService'
+import type { ColorFamily, Style } from '../services/attributeService'
 
 // Klucz techniczny wybarwienia → nazwa, którą klient sam by wypowiedział.
 const FINISH_PL: Record<string, string> = {
@@ -44,6 +44,35 @@ export function buildNotice(droppedFinish?: string, droppedStyle?: string): stri
     )
   }
   return zdania.length > 0 ? zdania.join(' ') : undefined
+}
+
+// Kolor jest filtrem TWARDYM (nienegocjowalnym — patrz chromaService.searchSimilar):
+// gdy nie ma trafień, nigdy nie dopełniamy wynikami łamiącymi kolor. Ale zero
+// wyników bez wyjaśnienia wygląda jak pusty katalog (frontend ma na to gotowy,
+// mylący tekst „Zaimportuj feed produktowy") — user prosi konkretnie o kolor,
+// więc dostaje konkretne zdanie, nie ogólnik o pustej bazie.
+const COLOR_PL: Record<ColorFamily, string> = {
+  white: 'białym',
+  black: 'czarnym',
+  grey: 'szarym',
+  beige: 'beżowym',
+  light_wood: 'jasnym drewnie',
+  medium_wood: 'średnim drewnie',
+  dark_wood: 'ciemnym drewnie',
+}
+
+export function buildEmptyResultNotice(filters?: HardFilters): string | undefined {
+  if (!filters) return undefined
+  const kryteria: string[] = []
+  if (filters.colors && filters.colors.length > 0) {
+    const nazwy = filters.colors.map((c) => COLOR_PL[c as ColorFamily] ?? c)
+    kryteria.push(`kolorze ${nazwy.join('/')}`)
+  }
+  if (filters.glass === true) kryteria.push('ze szkłem')
+  if (filters.glass === false) kryteria.push('bez przeszklenia')
+  if (filters.style) kryteria.push(`stylu ${STYLE_PL[filters.style] ?? filters.style}`)
+  if (kryteria.length === 0) return undefined
+  return `Nie mamy w katalogu drzwi w ${kryteria.join(', ')} pasujących do pozostałych kryteriów. Spróbuj innego doprecyzowania.`
 }
 
 export interface RezultatStylu {

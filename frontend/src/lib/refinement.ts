@@ -22,6 +22,15 @@ export interface DefChipa {
 }
 
 // Kolejność = kolejność renderu palety. Etykiety jak dziś w Rail.tsx.
+//
+// Style ograniczone do trzech, które w katalogu mają solidną liczbę trafień
+// (ekspert domenowy: "style nie sprawdzają się jako chipy" — skandynawskie
+// miało 1 trafienie na cały katalog, glamour 6, oba praktycznie zawsze
+// wygaszone i bezużyteczne jako filtr). Rustykalne/loftowe usunięte z palety
+// z tego samego powodu — mimo większej liczby trafień, decyzja eksperta domenowego to
+// zejście do rdzenia: klasyczne/nowoczesne/minimalistyczne. Custom text nadal
+// rozpoznaje wszystkie STYLES z attributeService — usunięcie chipa nie usuwa
+// stylu z backendu, tylko z palety wyboru.
 export const CHIPY: DefChipa[] = [
   { etykieta: 'jaśniejsze', grupa: 'jasność' },
   { etykieta: 'ciemniejsze', grupa: 'jasność' },
@@ -31,10 +40,6 @@ export const CHIPY: DefChipa[] = [
   { etykieta: 'klasyczne', grupa: 'styl' },
   { etykieta: 'nowoczesne', grupa: 'styl' },
   { etykieta: 'minimalistyczne', grupa: 'styl' },
-  { etykieta: 'rustykalne', grupa: 'styl' },
-  { etykieta: 'loftowe', grupa: 'styl' },
-  { etykieta: 'skandynawskie', grupa: 'styl' },
-  { etykieta: 'glamour', grupa: 'styl' },
 ]
 
 // Etykieta chipa (PL, przymiotnik) → enum stylu backendu (rzeczownik).
@@ -102,8 +107,19 @@ export function wyczyść(stan: StanZapytania): StanZapytania {
 // z opisem wnętrza ("jasne drzwi dębowe...") — jej przymiotniki względne/mgliste
 // nie mogą wyłączać guardu koloru dla tego, co user dopisał ("drzwi czarne").
 // Backend odpala na tym polu explicitColorFromQuery; puste → fallback do query.
+//
+// Grupa 'jasność' (jedyne chipy z etykietami "jaśniejsze"/"ciemniejsze") jest
+// świadomie wykluczona z tego pola — to TEN SAM bug co z bazą, jeden poziom
+// głębiej: gdy user ma aktywny chip "jaśniejsze" i OSOBNO dopisuje "drzwi
+// czarne", oba kroki lądowały w jednym stringu ("jaśniejsze, drzwi czarne"),
+// a RELATIVE_OR_VAGUE_RE w attributeService łapie "jaśniejsze" i kasuje guard
+// dla NIEZWIĄZANEGO koloru z innego kroku. Sam wpisany tekst ("czarne, ale
+// jaśniejsze" jako JEDEN krok) nadal poprawnie wyłącza guard — to zostaje.
 export function słowaUżytkownika(stan: StanZapytania): string {
-  return stan.kroki.map((k) => k.etykieta).join(', ')
+  return stan.kroki
+    .filter((k) => k.grupa !== 'jasność')
+    .map((k) => k.etykieta)
+    .join(', ')
 }
 
 export function budujZapytanie(stan: StanZapytania): string {

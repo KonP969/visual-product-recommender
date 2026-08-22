@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight, Settings } from 'lucide-react'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useSearch } from '@/hooks/useSearch'
@@ -33,8 +33,19 @@ export default function App() {
     hasMore,
   } = useSearch()
   const [showAdmin, setShowAdmin] = useState(false)
+  const wynikiRef = useRef<HTMLDivElement>(null)
 
   const refinement = useRefinement()
+
+  // Bug: po doprecyzowaniu (chip/tekst) strona zostawała przewinięta tam, gdzie
+  // była wcześniej — a to często ląduje w środku sekcji "A gdyby tak zaszaleć"
+  // (jest niżej niż siatka wyników), więc user wraca z nowymi wynikami, ale
+  // patrzy na wildcard. Nowe wyszukiwanie ZAWSZE wraca do góry wyników.
+  useEffect(() => {
+    if (appState === 'loading') {
+      wynikiRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [appState])
 
   // Baza = displayPl PIERWSZEGO wyniku. ustawBazę zamraża po pierwszym ustawieniu,
   // więc kolejne (tekstowe) wyniki jej nie nadpisują — tu ginie dryf.
@@ -94,7 +105,7 @@ export default function App() {
                 Dobierz drzwi do swojego wnętrza
               </h1>
               <p className="max-w-md text-[15px] text-ink-soft">
-                Wgraj zdjęcie pokoju, a zaproponujemy drzwi z katalogu Porta dopasowane
+                Wgraj zdjęcie pokoju, a zaproponujemy drzwi z katalogu dopasowane
                 kolorem i stylem
               </p>
             </div>
@@ -131,7 +142,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          <div className="grid items-start gap-10 lg:grid-cols-[360px_1fr] lg:gap-12">
+          <div ref={wynikiRef} className="grid items-start gap-10 lg:grid-cols-[360px_1fr] lg:gap-12">
             <Rail
               previewUrl={previewUrl}
               baza={refinement.stan.baza}

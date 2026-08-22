@@ -1,18 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { warianty } from '../plural'
+import { wariantyOpisowo } from '../plural'
 
-describe('warianty — polska odmiana', () => {
+describe('wariantyOpisowo — kubełki zamiast dokładnej liczby', () => {
   it.each([
-    [2, '2 warianty'],
-    [3, '3 warianty'],
-    [4, '4 warianty'],
-    [5, '5 wariantów'],
-    [11, '11 wariantów'],
-    [12, '12 wariantów'], // wyjątek nastu — nie "warianty"
-    [14, '14 wariantów'],
-    [22, '22 warianty'], // dwadzieścia dwa warianty
-    [25, '25 wariantów'],
+    [2, 'kilka wariantów'],
+    [3, 'kilka wariantów'],
+    [4, 'kilka wariantów'],
+    [5, 'wiele wariantów'],
+    [11, 'wiele wariantów'],
+    [25, 'wiele wariantów'],
   ])('%i → %s', (n, expected) => {
-    expect(warianty(n)).toBe(expected)
+    expect(wariantyOpisowo(n)).toBe(expected)
   })
 })

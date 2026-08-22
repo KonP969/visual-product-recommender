@@ -36,6 +36,24 @@ describe('classifyDoor — color from variant', () => {
     expect(classifyDoor(name).colorFamily).toBe(expected)
   })
 
+  // Bug: linia PORTA GLASS nazywa wariant typem szyby ("Szyba matowa", "Szyba
+  // grafitowa"), nie kolorem skrzydła — fallback na opis Gemini ("white frosted")
+  // dawał 'white', mimo że każde z tych 11 SKU ma w feedzie czarną ramę/okucia.
+  it('wariant "Szyba ..." (linia PORTA GLASS, rama zawsze czarna) → black', () => {
+    expect(
+      classifyDoor(
+        'PORTA GLASS szyba matowa - Szyba matowa',
+        'frosted glass residential interior glass door white frosted matte modern minimalist',
+      ).colorFamily,
+    ).toBe('black')
+    expect(
+      classifyDoor(
+        'PORTA GLASS szyba grafitowa matowa - Szyba grafitowa matowa',
+        'graphite tinted frosted glass residential interior door',
+      ).colorFamily,
+    ).toBe('black')
+  })
+
   // Bug: "PORTA GRANDE ... z czarną szybą - Szałwia" i "... Czarne Intarsje - Szałwia"
   // (8 wariantów w katalogu) lądowały jako 'black', bo "Szałwia" nie miała reguły
   // wariantu i klasyfikacja spadała na opis, gdzie wygrywało słowo "black" opisujące

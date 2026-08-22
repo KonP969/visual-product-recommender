@@ -22,7 +22,6 @@ describe('CHIPY — definicje', () => {
     expect(CHIPY.map((c) => c.etykieta)).toEqual([
       'jaśniejsze', 'ciemniejsze', 'ze szkłem', 'bez przeszklenia',
       'drewno naturalne', 'klasyczne', 'nowoczesne', 'minimalistyczne',
-      'rustykalne', 'loftowe', 'skandynawskie', 'glamour',
     ])
     expect(CHIPY.find((c) => c.etykieta === 'jaśniejsze')?.grupa).toBe('jasność')
     expect(CHIPY.find((c) => c.etykieta === 'klasyczne')?.grupa).toBe('styl')
@@ -159,6 +158,16 @@ describe('słowaUżytkownika — intencja z kroków, bez bazy', () => {
     s = dodajKrok(s, 'drzwi czarne', 'własne')
     expect(słowaUżytkownika(s)).toBe('bez przeszklenia, drzwi czarne')
   })
+
+  // Bug: chip "jaśniejsze" (grupa jasność) aktywny RAZEM z osobno dopisanym
+  // kolorem — oba kroki sklejone w jeden string łapały RELATIVE_OR_VAGUE_RE
+  // na "jaśniejsze" i kasowały guard koloru dla niepowiązanego "drzwi czarne".
+  // Grupa jasność musi być wykluczona z tego pola (patrz komentarz w kodzie).
+  it('pomija krok grupy "jasność" — nie zatruwa guardu koloru z innego kroku', () => {
+    let s = dodajKrok(baza('białe drzwi'), 'jaśniejsze', 'jasność')
+    s = dodajKrok(s, 'drzwi czarne', 'własne')
+    expect(słowaUżytkownika(s)).toBe('drzwi czarne')
+  })
 })
 
 describe('czyAktywny', () => {
@@ -170,11 +179,9 @@ describe('czyAktywny', () => {
 })
 
 describe('chipy stylu', () => {
-  it('CHIPY ma 7 stylów w grupie styl', () => {
+  it('CHIPY ma 3 style w grupie styl', () => {
     const style = CHIPY.filter((c) => c.grupa === 'styl').map((c) => c.etykieta)
-    expect(style).toEqual([
-      'klasyczne', 'nowoczesne', 'minimalistyczne', 'rustykalne', 'loftowe', 'skandynawskie', 'glamour',
-    ])
+    expect(style).toEqual(['klasyczne', 'nowoczesne', 'minimalistyczne'])
   })
   it('aktywnyStyl mapuje etykietę na enum backendu', () => {
     let s = dodajKrok(stanPoczątkowy('drzwi'), 'loftowe', 'styl')

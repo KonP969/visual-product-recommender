@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { buildNotice, decydujOStylu, resolveStyleFilter } from '../searchNotices'
+import { buildNotice, buildEmptyResultNotice, decydujOStylu, resolveStyleFilter } from '../searchNotices'
 import type { HardFilters } from '../../services/chromaService'
 
 vi.mock('../../services/styleIndex', () => ({
@@ -33,6 +33,32 @@ describe('buildNotice', () => {
 
   it('nieznany klucz stylu nie wywraca komunikatu', () => {
     expect(buildNotice(undefined, 'nieznany')).toContain('nieznany')
+  })
+})
+
+// Bug: "dopisz własnymi słowami" → "drzwi czarne" przy pustej puli twardego
+// filtra koloru wracało z generycznym "Katalog jest pusty. Zaimportuj feed..."
+// (tekst dla NAPRAWDĘ pustej bazy) — mylące, bo katalog ma tysiące produktów,
+// po prostu żaden nie pasuje do TEGO koloru. Zero wyników z twardego filtra
+// (kolor/szkło/styl — nienegocjowalne, patrz chromaService.searchSimilar)
+// potrzebuje własnego, konkretnego zdania.
+describe('buildEmptyResultNotice', () => {
+  it('brak filtrów → brak komunikatu (prawdziwie pusty katalog)', () => {
+    expect(buildEmptyResultNotice()).toBeUndefined()
+    expect(buildEmptyResultNotice({})).toBeUndefined()
+  })
+
+  it('twardy filtr koloru → konkretne zdanie z nazwą koloru po polsku', () => {
+    const n = buildEmptyResultNotice({ colors: ['black'] })
+    expect(n).toContain('czarnym')
+    expect(n).not.toContain('Zaimportuj')
+  })
+
+  it('łączy kolor, szkło i styl w jednym zdaniu', () => {
+    const n = buildEmptyResultNotice({ colors: ['white'], glass: true, style: 'loft' })
+    expect(n).toContain('białym')
+    expect(n).toContain('ze szkłem')
+    expect(n).toContain('loftowym')
   })
 })
 
