@@ -38,7 +38,7 @@ scripts/style-review.html
 vite.config.ts.timestamp-*
 
 # Zbudowana wizytowka (generowana ze zrodla docs/case-study.html)
-docs/case-study.build.html
+docs/case-study*.build.html
 
 # Historia sesji narzedzi AI i pliki robocze skryptow
 .specstory/

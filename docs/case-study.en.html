@@ -1,0 +1,691 @@
+<meta charset="utf-8">
+<title>Visual Product Recommender</title>
+
+<style>
+  :root {
+    --paper:   #F1F2EF;
+    --surface: #FFFFFF;
+    --ink:     #1B1E1C;
+    --ink-soft:#5C635E;
+    --rule:    #D8DBD6;
+    --rule-2:  #E7E9E5;
+    --accent:  #38566B;
+    --correct: #9E3B32;
+    --correct-bg: #FBF3F2;
+
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #141715;
+      --surface: #1C201D;
+      --ink:     #E8EBE6;
+      --ink-soft:#97A09A;
+      --rule:    #2E332F;
+      --rule-2:  #232824;
+      --accent:  #7FA6C0;
+      --correct: #D98077;
+      --correct-bg: #241C1B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:   #141715;
+    --surface: #1C201D;
+    --ink:     #E8EBE6;
+    --ink-soft:#97A09A;
+    --rule:    #2E332F;
+    --rule-2:  #232824;
+    --accent:  #7FA6C0;
+    --correct: #D98077;
+    --correct-bg: #241C1B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 24px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  .col  { max-width: 660px; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(34px, 5.2vw, 52px);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.06;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+
+  .thesis {
+    font-size: clamp(18px, 2.2vw, 21px);
+    line-height: 1.5;
+    color: var(--ink);
+    max-width: 30em;
+    margin: 0 0 34px;
+    text-wrap: pretty;
+  }
+
+  .thesis strong { font-weight: 700; }
+
+  /* Cokolwiek kończy nagłówek, nie dokłada marginesu do jego paddingu,
+     inaczej odstęp nad kreską rośnie dwukrotnie. */
+  .masthead > :last-child { margin-bottom: 0; }
+
+  /* ---------- sections ---------- */
+
+  section { padding: 64px 0 0; }
+
+  h2 {
+    font-family: var(--sans);
+    font-size: clamp(23px, 3vw, 29px);
+    font-weight: 640;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 630;
+    letter-spacing: -0.008em;
+    margin: 0 0 10px;
+  }
+
+  p { margin: 0 0 18px; text-wrap: pretty; }
+  .col p:last-child { margin-bottom: 0; }
+
+  .lead { font-size: 18.5px; }
+
+  em.term {
+    font-style: normal;
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--rule-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ---------- figures ---------- */
+
+  figure { margin: 0; }
+
+  .shot {
+    margin: 34px 0 0;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--surface);
+    line-height: 0;
+  }
+  .shot img { width: 100%; height: auto; display: block; }
+
+  figcaption {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    margin-top: 12px;
+    max-width: 62ch;
+  }
+
+  .diagram {
+    margin: 30px 0 0;
+    padding: 26px 22px 20px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: var(--surface);
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; width: 100%; min-width: 880px; height: auto; }
+
+  /* Diagram bierze kolory z tokenów motywu. Atrybuty prezentacyjne w SVG
+     zostają jako zapas, CSS je nadpisuje. */
+  .d-box   { fill: var(--paper);  stroke: var(--ink); stroke-width: 1; stroke-opacity: 0.35; }
+  .d-key   { fill: var(--accent); fill-opacity: 0.09; stroke: var(--accent); stroke-width: 1.5; }
+  .d-line  { stroke: var(--ink);  stroke-opacity: 0.55; fill: none; }
+  /* Grot strzałki bez jawnego wypełnienia domyślnie jest CZARNY, czyli znika
+     w ciemnym motywie. Musi brać kolor z tokenu. */
+  .d-arrow { fill: var(--ink); fill-opacity: 0.55; }
+  .d-t     { fill: var(--ink); }
+  /* Hierarchia idzie rozmiarem i grubością, nie wyblaknięciem. Krycie poniżej
+     ~0,75 nie przechodzi kontrastu AA przy tych rozmiarach tekstu. */
+  .d-soft  { fill: var(--ink); fill-opacity: 0.78; }
+  .d-lane  { fill: var(--ink); fill-opacity: 0.72; }
+  .d-rule  { stroke: var(--ink); stroke-opacity: 0.18; }
+
+  /* Akcent diagramu jedzie z tokenów motywu. Sztywny hex byłby nieczytelny
+     na ciemnym tle. CSS wygrywa z atrybutem prezentacyjnym, więc atrybuty
+     w SVG zostają jako fallback. */
+  .d-accent-stroke { stroke: var(--accent); }
+  .d-accent-fill   { fill:   var(--accent); }
+
+  /* ---------- process ---------- */
+
+  ol.process {
+    list-style: none;
+    counter-reset: step;
+    padding: 0;
+    margin: 30px 0 0;
+    border-top: 1px solid var(--rule);
+  }
+  ol.process li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 46px 1fr auto;
+    gap: 0 18px;
+    align-items: baseline;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule-2);
+  }
+  ol.process li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+  }
+  .step-name { font-family: var(--sans); font-size: 15.5px; font-weight: 550; }
+  .step-art {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    text-align: right;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- corrections (the centerpiece) ---------- */
+
+  .corrections { margin: 32px 0 0; display: grid; gap: 18px; }
+
+  .fix {
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: var(--surface);
+    padding: 22px 24px 20px;
+  }
+
+  .fix-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 26px;
+    margin: 14px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule-2);
+  }
+  @media (max-width: 620px) {
+    .fix-split { grid-template-columns: 1fr; gap: 16px; }
+  }
+
+  .fix-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 5px;
+  }
+  .fix-said { color: var(--correct); font-weight: 600; font-family: var(--sans); font-size: 15px; }
+  .fix-was  { font-weight: 600; font-family: var(--sans); font-size: 15px; }
+  .fix-why  { font-size: 15.5px; color: var(--ink-soft); margin: 14px 0 0; }
+  .fix-scale {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+    color: var(--correct);
+    margin: 12px 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .takeaway {
+    margin: 30px 0 0;
+    padding: 22px 26px;
+    background: var(--correct-bg);
+    border: 1px solid var(--correct);
+    border-radius: 2px;
+    font-size: 18px;
+    line-height: 1.55;
+  }
+  .takeaway strong { font-weight: 700; }
+
+  /* ---------- stats ---------- */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 1px;
+    margin: 30px 0 0;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .stat { background: var(--surface); padding: 20px 18px; }
+  .stat dt {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+  }
+  .stat dd {
+    font-family: var(--sans);
+    font-size: 27px;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- stack table ---------- */
+
+  .stack {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 26px 0 0;
+    font-size: 15.5px;
+  }
+  .stack th, .stack td {
+    text-align: left;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule-2);
+    vertical-align: baseline;
+  }
+  .stack th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 400;
+    color: var(--ink-soft);
+    width: 34%;
+    padding-right: 20px;
+  }
+  .stack td { font-family: var(--sans); font-size: 15px; }
+
+  /* ---------- footnote ---------- */
+
+  .footnote {
+    margin: 72px 0 0;
+    padding: 24px 0 0;
+    border-top: 1px solid var(--ink);
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    max-width: 68ch;
+  }
+  .footnote p { margin: 0 0 12px; }
+  .footnote p:last-child { margin: 0; }
+</style>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>Visual Product Recommender</h1>
+    <p class="thesis">
+      You upload a photo of a room and get interior doors matched to it by colour and style.
+    </p>
+  </header>
+
+  <section>
+    <figure>
+      <div class="shot">
+        <img src="assets/screenshot.jpg"
+             alt="The app interface: on the left a photo of a dark modern living room with a generated style recommendation, on the right a grid of matching grey and graphite doors with prices.">
+      </div>
+      <figcaption>
+        A dark, modern room to graphite and grey doors. The style description on the left is
+        generated by the model; the filters under it narrow the result without uploading again.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="col">
+    <h2>Why similarity alone isn't enough</h2>
+    <p class="lead">
+      People pick doors by eye, but describe them in words: "something darker", "no glass",
+      "loft style". The search has to handle both at once.
+    </p>
+    <p>
+      Vectors catch similarity and stop there. Ask for doors with no glass, you got glazed
+      ones. Ask for black, you got dark brown. Rewording the prompt didn't help here, because
+      a vector cannot account for (or rather, encode) either negation or a hard colour.
+    </p>
+    <p>
+      So at import time I compute three attributes for each product and store them alongside
+      it: colour family, whether it has glass, and style. The search filters on those hard,
+      inside the same query that computes similarity. The rest of the similarity can be
+      pulled from the vector.
+    </p>
+  </section>
+
+  <section>
+    <div class="col">
+      <h2>How it works</h2>
+    </div>
+    <figure class="diagram">
+      <svg viewBox="0 0 1000 320" role="img"
+           aria-label="Two tracks converging in the vector store. The upper track runs live: a photo of a room goes to Gemini Flash, the description to the CLIP model, and the vector to ChromaDB. The lower track runs once, at catalogue import: product attributes, that is colour, glass and style, are derived from the XML feed. Both enter the same query. Then MMR with deduplication collapses repeats and diversifies the result, giving ten suggestions.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" class="d-arrow"></path>
+          </marker>
+          <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" class="d-accent-fill"></path>
+          </marker>
+        </defs>
+
+        <!-- ===== track 1: the query, computed live ===== -->
+        <text x="24" y="26" class="d-lane" font-family="ui-monospace, monospace"
+              font-size="11" letter-spacing="1.4">LIVE, ON EVERY SEARCH</text>
+
+        <rect x="24"  y="44" width="116" height="58" rx="2" class="d-box"></rect>
+        <rect x="170" y="44" width="140" height="58" rx="2" class="d-box"></rect>
+        <rect x="340" y="44" width="140" height="58" rx="2" class="d-box"></rect>
+
+        <g text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif">
+          <text x="82"  y="78"  class="d-t" font-size="12" font-weight="600">photo of a room</text>
+          <text x="240" y="70"  class="d-t" font-size="13" font-weight="600">Gemini Flash</text>
+          <text x="240" y="88"  class="d-soft" font-size="11">describes the room</text>
+          <text x="410" y="70"  class="d-t" font-size="13" font-weight="600">CLIP ViT-B/32</text>
+          <text x="410" y="88"  class="d-soft" font-size="11">text to vector</text>
+        </g>
+
+        <g class="d-line" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="140" y1="73" x2="164" y2="73"></line>
+          <line x1="310" y1="73" x2="334" y2="73"></line>
+        </g>
+
+        <!-- ===== track 2: the catalogue, computed once at import ===== -->
+        <text x="24" y="216" class="d-lane" font-family="ui-monospace, monospace"
+              font-size="11" letter-spacing="1.4">ONCE, AT CATALOGUE IMPORT</text>
+
+        <rect x="24"  y="234" width="116" height="58" rx="2" class="d-box"></rect>
+        <rect x="170" y="234" width="200" height="58" rx="2" class="d-box"></rect>
+
+        <g text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif">
+          <text x="82"  y="268" class="d-t" font-size="12" font-weight="600">XML feed</text>
+          <text x="270" y="260" class="d-t" font-size="13" font-weight="600">product attributes</text>
+          <text x="270" y="278" class="d-soft" font-size="11">colour · glass · style</text>
+        </g>
+
+        <g class="d-line" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="140" y1="263" x2="164" y2="263"></line>
+        </g>
+
+        <!-- ===== both tracks converge into one query ===== -->
+        <path d="M 480 73 C 508 73, 500 150, 524 150" class="d-line" stroke-width="1.4"
+              marker-end="url(#ar)"></path>
+        <path d="M 370 263 C 452 263, 450 190, 524 190" class="d-accent-stroke" stroke-width="1.6"
+              fill="none" marker-end="url(#ar-a)"></path>
+
+        <g font-family="ui-monospace, monospace" font-size="11" text-anchor="end">
+          <text x="518" y="136" class="d-soft">vector</text>
+          <text x="518" y="214" class="d-accent-fill">where filters</text>
+        </g>
+
+        <!-- ===== the shared query and ranking ===== -->
+        <rect x="530" y="132" width="152" height="76" rx="2" class="d-key"></rect>
+        <rect x="714" y="132" width="140" height="76" rx="2" class="d-box"></rect>
+        <rect x="886" y="132" width="90"  height="76" rx="2" class="d-box"></rect>
+
+        <g text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif">
+          <text x="606" y="164" class="d-t" font-size="13" font-weight="600">ChromaDB</text>
+          <text x="606" y="182" class="d-soft" font-size="11">similarity</text>
+          <text x="784" y="164" class="d-t" font-size="13" font-weight="600">MMR + dedup</text>
+          <text x="784" y="182" class="d-soft" font-size="11">collapses repeats</text>
+          <text x="931" y="176" class="d-t" font-size="11" font-weight="600">10 results</text>
+        </g>
+
+        <g class="d-line" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="682" y1="170" x2="708" y2="170"></line>
+          <line x1="854" y1="170" x2="880" y2="170"></line>
+        </g>
+
+        <g font-family="ui-monospace, monospace" font-size="11" text-anchor="middle">
+          <text x="695" y="124" class="d-soft">candidates</text>
+          <text x="867" y="124" class="d-soft">ranking</text>
+        </g>
+
+        <text x="606" y="236" class="d-accent-fill" text-anchor="middle"
+              font-family="ui-monospace, monospace" font-size="11">both inputs in one query</text>
+      </svg>
+      <figcaption>
+        Hard filters aren't a separate stage. They go into the query alongside the vector,
+        because that's the only way "no glass" actually means zero glass.
+      </figcaption>
+    </figure>
+
+    <div class="col" style="margin-top:30px">
+      <h3>What happens in the "MMR + dedup" step</h3>
+      <p>
+        Without this stage the top ten is often ten near-identical doors. That happens for
+        two different reasons, so there are two remedies.
+      </p>
+      <p>
+        <strong>Collapsing variants (dedup).</strong> The feed carries several entries under
+        an identical name: the same model in the same colour, from different price lines. In
+        a grid they look like repeats of one product. So I collapse them into a single card,
+        showing the best-matching variant, the cheapest price ("from 1,051 zł") and how many
+        variants wait in the configurator.
+      </p>
+      <p>
+        <strong>Diversification (MMR).</strong> Even with the repeats gone, similarity search
+        likes to return ten variations on one idea, because they all sit close to the query.
+        MMR (Maximal Marginal Relevance) picks ten out of a larger candidate pool, scoring
+        each next one not only on how well it matches the query, but on how much it differs
+        from the ones already chosen.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col">
+      <h2>How the app was built</h2>
+    </div>
+    <ol class="process">
+      <li><span class="step-name">Brainstorm: what do I actually want</span><span class="step-art">conversation</span></li>
+      <li><span class="step-name">Design specification</span><span class="step-art">9 documents</span></li>
+      <li><span class="step-name">Implementation plan, split into tasks</span><span class="step-art">11 documents</span></li>
+      <li><span class="step-name">Test-first implementation, task by task</span><span class="step-art">259 tests</span></li>
+      <li><span class="step-name">Manual click-through by the user (me) against a scenario</span><span class="step-art">checklist A to I</span></li>
+      <li><span class="step-name">Decision log, including negative results</span><span class="step-art">open issues document</span></li>
+    </ol>
+
+  </section>
+
+  <section>
+    <div class="col">
+      <h2>Where the model got it wrong most often</h2>
+      <p class="lead">
+        All four of these bugs passed the tests. They surfaced only when I sat down and
+        looked at real results on a real feed.
+      </p>
+    </div>
+
+    <div class="corrections">
+
+      <article class="fix">
+        <h3>Green doors classified as black</h3>
+        <div class="fix-split">
+          <div>
+            <p class="fix-label">What the classifier decided</p>
+            <p class="fix-said">colour: black</p>
+          </div>
+          <div>
+            <p class="fix-label">What was actually true</p>
+            <p class="fix-was">sage green</p>
+          </div>
+        </div>
+        <p class="fix-why">
+          The "Szałwia" (sage) finish had no colour rule of its own, so classification fell
+          back to the model's English description. There, the word <em class="term">black</em>
+          described a <strong>black glass insert</strong>, not the door leaf. Searching
+          "black doors" returned green ones.
+        </p>
+        <p class="fix-scale">68 variants with the wrong colour</p>
+      </article>
+
+      <article class="fix">
+        <h3>Black doors classified as white</h3>
+        <div class="fix-split">
+          <div>
+            <p class="fix-label">What the classifier decided</p>
+            <p class="fix-said">colour: white</p>
+          </div>
+          <div>
+            <p class="fix-label">What was actually true</p>
+            <p class="fix-was">a black frame</p>
+          </div>
+        </div>
+        <p class="fix-why">
+          A line of plain glass panels names the variant after the glass type, for example
+          "matte pane". The description read <em class="term">white frosted</em>, which
+          referred to the <strong>opacity of the glass</strong>, not the frame. The frame on
+          every one of those SKUs is black.
+        </p>
+        <p class="fix-scale">11 SKUs · searching "white doors" returned black ones</p>
+      </article>
+
+      <article class="fix">
+        <h3>Entrance doors passing as interior ones</h3>
+        <div class="fix-split">
+          <div>
+            <p class="fix-label">What the classifier decided</p>
+            <p class="fix-said">type guessed from the name</p>
+          </div>
+          <div>
+            <p class="fix-label">What was actually true</p>
+            <p class="fix-was">type is stated in the feed</p>
+          </div>
+        </div>
+        <p class="fix-why">
+          The code guessed the door type from the product name, even though the feed states
+          it outright in a separate field. Anything unrecognised defaulted to "interior",
+          along with technical, sliding and apartment entrance doors.
+        </p>
+        <p class="fix-scale">1,919 variants across 88 models · catalogue 10,873 → 6,360</p>
+      </article>
+
+      <article class="fix">
+        <h3>The variant counter counted the wrong set</h3>
+        <div class="fix-split">
+          <div>
+            <p class="fix-label">What the classifier decided</p>
+            <p class="fix-said">variants in the search pool</p>
+          </div>
+          <div>
+            <p class="fix-label">What was actually true</p>
+            <p class="fix-was">variants in the whole catalogue</p>
+          </div>
+        </div>
+        <p class="fix-why">
+          The product card showed how many variants appeared in that one search, so it almost
+          never matched the manufacturer's configurator. The customer saw a number they had
+          no way to verify.
+        </p>
+        <p class="fix-scale">a true number answering the wrong question</p>
+      </article>
+
+    </div>
+
+    <div>
+      <p class="takeaway">
+        <strong>Which is what real human-in-the-loop work looks like: tests check that the
+        code does what you wrote. They don't check whether you wrote the right thing.</strong>
+        All four bugs passed 259 green tests and surfaced only when someone looked at actual
+        doors.
+      </p>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2>And what couldn't be done?</h2>
+    <p>
+      Style recognition that matches reality.
+    </p>
+    <p>
+      Take Scandinavian. One door model comes in a dozen or so colours, and style is assigned
+      to the whole model, not to an individual colour. For most styles that works: a loft door
+      is a loft door whether it's black or oak.
+    </p>
+    <p>
+      Scandinavian doesn't behave that way, because colour is exactly the point. Pale wood.
+      The same model in dark oak isn't Scandinavian any more. And since nearly every model
+      ships in both pale and dark finishes, none of them collects enough votes from the model
+      to earn the label.
+    </p>
+
+  </section>
+
+  <section>
+    <div class="col">
+      <h2>In numbers</h2>
+    </div>
+    <dl class="stats">
+      <div class="stat"><dt>Commits</dt><dd>134</dd></div>
+      <div class="stat"><dt>Tests</dt><dd>259</dd></div>
+      <div class="stat"><dt>Products</dt><dd>6,360</dd></div>
+      <div class="stat"><dt>Specs</dt><dd>9</dd></div>
+      <div class="stat"><dt>Plans</dt><dd>11</dd></div>
+      <div class="stat"><dt>Models</dt><dd>513</dd></div>
+    </dl>
+
+    <div class="col">
+      <table class="stack">
+        <tbody>
+          <tr><th scope="row">Frontend</th><td>React 19 · TypeScript · Vite · Tailwind</td></tr>
+          <tr><th scope="row">Backend</th><td>Node.js · Express 5 · TypeScript</td></tr>
+          <tr><th scope="row">Embeddings</th><td>CLIP ViT-B/32 via FastAPI (Python sidecar)</td></tr>
+          <tr><th scope="row">Vector store</th><td>ChromaDB</td></tr>
+          <tr><th scope="row">Language model</th><td>Gemini Flash: room description and match reasons</td></tr>
+          <tr><th scope="row">Tooling</th><td>Claude Code</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="col footnote">
+    <p>
+      The catalogue comes from the public XML product feed of the company I work for. The
+      feed is published openly for retail partners and price comparison sites. The app does
+      not copy product images, it loads them straight from the manufacturer's CDN, the same
+      way any partner using that feed does. The one exception is the screenshot above,
+      showing the working interface.
+    </p>
+    <p>
+      I built this after hours, on my own account. It isn't an official product of the
+      manufacturer.
+    </p>
+  </div>
+
+</div>
