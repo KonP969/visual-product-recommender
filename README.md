@@ -167,9 +167,10 @@ Operational notes: `CLAUDE.md`.
 ## A note on the data
 
 The catalogue comes from the public XML product feed of the company I work for. The feed
-is published openly for retail partners and price comparison sites. Product images are
-not copied into this repository. They load straight from the manufacturer's CDN, the same
-way any partner using that feed does it.
+is published openly for retail partners and price comparison sites. The app does not copy
+product images, it loads them straight from the manufacturer's CDN, the same way any
+partner using that feed does. The only image in this repository is the screenshot in
+`docs/assets`, showing the working interface.
 
 I built this after hours, on my own account. It isn't an official product of the
 manufacturer.

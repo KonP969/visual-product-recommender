@@ -166,8 +166,9 @@ Uwagi eksploatacyjne: `CLAUDE.md`.
 ## Uwaga o danych
 
 Katalog pochodzi z publicznego feedu produktowego XML firmy, w której pracuję. Feed jest
-jawnie udostępniany partnerom handlowym i porównywarkom. Zdjęcia produktów nie są
-kopiowane. Ładują się prosto z CDN producenta, tak jak u każdego partnera korzystającego
-z tego feedu.
+jawnie udostępniany partnerom handlowym i porównywarkom. Aplikacja nie kopiuje zdjęć
+produktów, ładuje je prosto z CDN producenta, tak jak każdy partner korzystający z tego
+feedu. Jedyny obraz w repozytorium to zrzut ekranu w `docs/assets`, pokazujący działający
+interfejs.
 
 Robiłem go po godzinach, na własny rachunek. To nie jest oficjalny produkt producenta.
