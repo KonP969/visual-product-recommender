@@ -119,7 +119,7 @@ etykietę.
 
 | | |
 |---|---|
-| Commity | 134 |
+| Commity | 130+ |
 | Testy | 259 |
 | Produkty | 6 360 |
 | Modele | 513 |

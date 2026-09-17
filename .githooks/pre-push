@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Blokuje push, jeśli którykolwiek WYPYCHANY commit wprowadza sekret:
+# klucz API, token albo klucz prywatny. Sprawdza całą wypychaną historię
+# (dodane linie i opisy commitów), a nie tylko bieżący stan plików, bo sekret
+# usunięty w późniejszym commicie nadal siedzi w historii.
+#
+# Włączenie (raz, po sklonowaniu):
+#   git config core.hooksPath .githooks
+#
+# Opcjonalne wzorce lokalne: .githooks/patterns.local (poza repozytorium,
+# w .gitignore). Jedno wyrażenie regularne (ERE) na linię, # to komentarz,
+# wielkość liter bez znaczenia.
+#
+# Awaryjne pominięcie, tylko przy świadomie fałszywym trafieniu:
+#   git push --no-verify
+
+set -u
+
+CZERWONY=$'\033[31m'; ZIELONY=$'\033[32m'; RESET=$'\033[0m'
+ZERO=0000000000000000000000000000000000000000
+KATALOG="$(git rev-parse --show-toplevel)/.githooks"
+
+SEKRETY='AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9_-]{32,}|xox[baprs]-[0-9A-Za-z-]{10,}|gh[pousr]_[A-Za-z0-9]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+
+LOKALNE=""
+if [ -f "$KATALOG/patterns.local" ]; then
+  LOKALNE=$(grep -vE '^\s*(#|$)' "$KATALOG/patterns.local" | tr -d '\r' | paste -sd'|' -)
+fi
+
+# Dodane linie z każdego commita w zakresie, poprzedzone skrótem commita.
+dodane_linie() {
+  git log -p --no-color --no-ext-diff --format='@@COMMIT %h' "$@" \
+      -- . ':(exclude)*package-lock.json' 2>/dev/null |
+    awk '/^@@COMMIT /{c=$2; next}
+         /^\+\+\+ /{plik=substr($0,7); next}
+         /^\+/{print c " " plik ": " substr($0,2)}'
+}
+
+sprawdz() {
+  local etykieta="$1" wzorzec="$2" flagi="$3" zrodlo="$4"
+  [ -z "$wzorzec" ] && return 0
+  local t
+  t=$(printf '%s\n' "$zrodlo" | grep $flagi -E -- "$wzorzec" | cut -c1-140 | head -5)
+  if [ -n "$t" ]; then
+    echo "${CZERWONY}[BLOKADA]${RESET} $etykieta"
+    printf '%s\n' "$t" | sed 's/^/    /'
+    echo
+    return 1
+  fi
+  return 0
+}
+
+blad=0
+while read -r lokalny_ref lokalny_sha zdalny_ref zdalny_sha; do
+  [ "$lokalny_sha" = "$ZERO" ] && continue   # usuwanie gałęzi
+
+  # Nowa gałąź albo historia przepisana (zdalnego commita nie ma lokalnie):
+  # sprawdzamy całą historię osiągalną z wypychanego commita.
+  if [ "$zdalny_sha" = "$ZERO" ] || ! git cat-file -e "$zdalny_sha^{commit}" 2>/dev/null; then
+    zakres=("$lokalny_sha")
+  else
+    zakres=("$zdalny_sha..$lokalny_sha")
+  fi
+
+  echo "Sprawdzam $(git rev-list --count "${zakres[@]}") commitów wypychanych do $zdalny_ref..."
+  linie=$(dodane_linie "${zakres[@]}")
+  opisy=$(git log --format='%h %B' "${zakres[@]}")
+
+  sprawdz "Sekret w treści commita." "$SEKRETY" ""   "$linie" || blad=1
+  sprawdz "Sekret w opisie commita." "$SEKRETY" ""   "$opisy" || blad=1
+  sprawdz "Wzorzec lokalny w treści." "$LOKALNE" "-i" "$linie" || blad=1
+  sprawdz "Wzorzec lokalny w opisie." "$LOKALNE" "-i" "$opisy" || blad=1
+done
+
+if [ "$blad" -ne 0 ]; then
+  echo "${CZERWONY}Push wstrzymany.${RESET}"
+  exit 1
+fi
+echo "${ZIELONY}Czysto.${RESET}"
+exit 0

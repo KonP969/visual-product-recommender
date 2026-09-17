@@ -45,3 +45,6 @@ docs/case-study*.build.html
 .cursorindexingignore
 scripts/*_progress.json
 2026-*-zrbmy-projekt-*.txt
+
+# Lokalne wzorce strażnika pre-push
+.githooks/patterns.local
